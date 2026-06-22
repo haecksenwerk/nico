@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="N I C O">
+</p>
+
 <br />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&nbsp;
@@ -10,7 +14,8 @@
 
 Control your Nikon camera over USB (PTP/OTG) directly from your Android device. Built with Kotlin and Jetpack Compose (Material 3).
 
-Targets **Nikon Z models**; other Nikon cameras supporting the PTP protocol may work.
+The app has been tested exclusively on a Google Pixel 9 using a Nikon Z fc. While other Nikon Z models should be compatible, certain functions may vary by camera model. 
+Additionally, please ensure your Android device supports USB-OTG mode.
 
 ---
 
@@ -46,19 +51,24 @@ Grab the latest signed APK directly from the [Releases](https://github.com/haeck
 
 ---
 
+## Usage
+
+1. **Connect** the camera to your phone with a USB-OTG cable and power it on - the app connects automatically.
+2. **Live view** starts on the main screen. Tap the camera icon to toggle it on or off.
+3. **Change settings** by tapping any property tile (aperture, white balance, metering, focus mode) and selecting a value from the picker.
+   - Mode, Shutter speed, EV compensation, and ISO are **display-only** - they reflect the current camera state but cannot be changed from the app.
+4. **Capture** a photo with the shutter button. Use the timer selector to add a delay before release.
+5. **Browse** pictures on the camera card in the browser tab. Tap a picture to preview it.
+6. **Download** pictures from the browser - saved to the **Pictures** folder on your phone and visible in the **nico** album in Google Photos.
+
+---
+
 ## Requirements
 
 - Android phone with USB OTG / USB host support
 - Nikon camera set to **PTP** (not MTP or "iPhone") USB mode
-- USB OTG cable or adapter
 
 ---
-
-## Support
-
-If you find N I C O useful, consider buying me a coffee :)
-
-## [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/haecksenwerk)
 
 ## License
 
