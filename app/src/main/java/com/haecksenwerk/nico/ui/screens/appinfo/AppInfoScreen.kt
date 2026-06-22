@@ -25,7 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import coil3.compose.AsyncImage
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.haecksenwerk.nico.BuildConfig
@@ -83,8 +84,8 @@ fun AppInfoScreen(
                 }
             }
 
-            AsyncImage(
-                model = R.mipmap.ic_launcher_round,
+            Image(
+                painter = painterResource(R.drawable.ic_launcher_foreground),
                 contentDescription = "N I C O",
                 modifier = Modifier
                     .size(140.dp)

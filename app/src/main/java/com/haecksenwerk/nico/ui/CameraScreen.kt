@@ -3,6 +3,7 @@ package com.haecksenwerk.nico.ui
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -73,16 +74,13 @@ import com.haecksenwerk.nico.ui.theme.NicoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-// ── Palette ───────────────────────────────────────────────────────────────────
+// ── Palette (semantic / accent — same on dark and light) ─────────────────────
+// Surface and text colours are resolved from MaterialTheme.colorScheme at each
+// call site so they adapt automatically to dark/light and the user's chosen theme.
 
-private val BgMain = Color(0xFF141414)
-private val BgCard = Color(0xFF1E1E1E)
-private val TextPrimary = Color(0xFFEEEEEE)
-private val TextSecondary = Color(0xFF777777)
-private val TextDim = Color(0xFF444444)
 private val AccentYellow = Color(0xFFFFCC00)
-private val ColorGreen = Color(0xFF4CAF50)
-private val ColorRed = Color(0xFFEF5350)
+private val ColorGreen   = Color(0xFF4CAF50)
+private val ColorRed     = Color(0xFFEF5350)
 
 private val RELEASE_DELAYS = listOf(0, 2, 5, 10)
 
@@ -173,9 +171,10 @@ private fun StatusBar(
     state: ConnectionState,
     battery: Int,
 ) {
+    val secondary = MaterialTheme.colorScheme.onSurfaceVariant
     val (label, dot) = when (state) {
-        ConnectionState.IDLE -> "No camera" to TextSecondary
-        ConnectionState.DETECTING -> "Detecting…" to TextSecondary
+        ConnectionState.IDLE -> "No camera" to secondary
+        ConnectionState.DETECTING -> "Detecting…" to secondary
         ConnectionState.CONNECTING -> "Connecting…" to AccentYellow
         ConnectionState.USB_CONNECTED -> "Connected" to AccentYellow
         ConnectionState.READY -> "Active" to ColorGreen
@@ -207,7 +206,7 @@ private fun StatusBar(
         // Centre: app name, always visible
         Text(
             text = "N I C O",
-            color = TextDim,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 4.sp,
@@ -235,7 +234,7 @@ private fun BatteryIcon(level: Int, modifier: Modifier = Modifier) {
     val tint = when {
         level < 15 -> ColorRed
         level < 30 -> AccentYellow
-        else -> TextSecondary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 
     Canvas(modifier = modifier.size(28.dp, 12.dp)) {
@@ -370,12 +369,12 @@ private fun SettingTile(label: String, value: String, modifier: Modifier = Modif
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(BgCard)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .padding(horizontal = 6.dp, vertical = 12.dp),
     ) {
         Text(
             text = label,
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 9.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.2.sp,
@@ -383,7 +382,7 @@ private fun SettingTile(label: String, value: String, modifier: Modifier = Modif
         Spacer(Modifier.height(4.dp))
         Text(
             text = value,
-            color = TextPrimary,
+            color = MaterialTheme.colorScheme.onSurface,
             fontSize = 16.sp,
             fontWeight = FontWeight.Light,
             textAlign = TextAlign.Center,
@@ -424,7 +423,7 @@ private fun EditableTile(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(RoundedCornerShape(8.dp))
-                .background(if (inEditMode) Color(0xFF252525) else BgCard)
+                .background(if (inEditMode) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainerHigh)
                 .padding(horizontal = 6.dp, vertical = 4.dp)
                 .pointerInput(editProp.displayValues, editProp.currentIndex) {
                     if (editProp.displayValues.isEmpty()) return@pointerInput
@@ -475,7 +474,7 @@ private fun EditableTile(
         ) {
             Text(
                 text = label,
-                color = if (inEditMode) AccentYellow else TextSecondary,
+                color = if (inEditMode) AccentYellow else MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.2.sp,
@@ -483,7 +482,7 @@ private fun EditableTile(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = displayValue,
-                color = if (inEditMode) AccentYellow else TextPrimary,
+                color = if (inEditMode) AccentYellow else MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Light,
                 textAlign = TextAlign.Center,
@@ -506,19 +505,21 @@ private fun EditableTile(
 private fun PickerWheel(labels: List<String>, selectedIndex: Int) {
     val slotH = 44.dp
 
+    val pickerBg = MaterialTheme.colorScheme.surfaceContainerHighest
+    val pickerSelection = MaterialTheme.colorScheme.surfaceVariant
     Box(
         modifier = Modifier
             .width(130.dp)
             .height(slotH * 5)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0xFF242424)),
+            .background(pickerBg),
     ) {
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
                 .height(slotH)
-                .background(Color(0xFF333333)),
+                .background(pickerSelection),
         )
 
         Column(
@@ -530,7 +531,7 @@ private fun PickerWheel(labels: List<String>, selectedIndex: Int) {
                 val dist = abs(relIdx)
                 val itemAlpha = when (dist) { 0 -> 1f; 1 -> 0.55f; else -> 0.2f }
                 val textSize = when (dist) { 0 -> 17.sp; 1 -> 13.sp; else -> 11.sp }
-                val textColor = if (dist == 0) AccentYellow else TextPrimary
+                val textColor = if (dist == 0) AccentYellow else MaterialTheme.colorScheme.onSurface
 
                 Box(
                     modifier = Modifier.height(slotH).fillMaxWidth(),
@@ -569,15 +570,15 @@ private fun ReleaseDelaySelector(
                     activeContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                     activeContentColor = MaterialTheme.colorScheme.primary,
                     activeBorderColor = MaterialTheme.colorScheme.primary,
-                    inactiveContainerColor = BgCard,
-                    inactiveContentColor = TextSecondary,
-                    inactiveBorderColor = Color(0xFF2A2A2A),
-                    disabledActiveContainerColor = Color(0xFF2C2C2C),
-                    disabledActiveContentColor = TextDim,
-                    disabledActiveBorderColor = Color(0xFF2A2A2A),
-                    disabledInactiveContainerColor = Color(0xFF1A1A1A),
-                    disabledInactiveContentColor = TextDim,
-                    disabledInactiveBorderColor = Color(0xFF2A2A2A),
+                    inactiveContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    inactiveBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    disabledActiveContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    disabledActiveContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    disabledActiveBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                    disabledInactiveContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    disabledInactiveContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    disabledInactiveBorderColor = MaterialTheme.colorScheme.outlineVariant,
                 ),
                 icon = {},
             ) {
@@ -611,7 +612,7 @@ private fun LiveViewArea(
         ) {
             Text(
                 text = "LIVE VIEW",
-                color = TextSecondary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.2.sp,
@@ -619,7 +620,7 @@ private fun LiveViewArea(
             if (cameraName.isNotEmpty()) {
                 Text(
                     text = cameraName,
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
                     letterSpacing = 1.sp,
@@ -630,14 +631,19 @@ private fun LiveViewArea(
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(if (isActive) AccentYellow.copy(alpha = 0.15f) else Color(0xFF252525))
+                    .border(
+                        width = 1.dp,
+                        color = if (isActive) AccentYellow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline,
+                        shape = RoundedCornerShape(10.dp),
+                    )
+                    .background(if (isActive) AccentYellow.copy(alpha = 0.15f) else Color.Transparent)
                     .clickable(onClick = onToggle)
                     .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
                 Icon(
                     imageVector = if (isActive) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                     contentDescription = if (isActive) "Stop live view" else "Start live view",
-                    tint = if (isActive) AccentYellow else TextSecondary,
+                    tint = if (isActive) AccentYellow else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(14.dp),
                 )
             }
@@ -667,7 +673,7 @@ private fun LiveViewArea(
                 else -> Icon(
                     imageVector = Icons.Default.PhotoCamera,
                     contentDescription = null,
-                    tint = TextDim,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.size(52.dp),
                 )
             }
@@ -686,14 +692,14 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "N I C O",
-            color = TextDim,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 5.sp,
         )
         Text(
             text = "NIKON CONTROL",
-            color = TextSecondary,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontSize = 22.sp,
             fontWeight = FontWeight.ExtraLight,
             letterSpacing = 6.sp,
@@ -708,7 +714,7 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
                 )
                 Text(
                     "Opening PTP session…",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                 )
             }
@@ -720,7 +726,7 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
                 )
                 Text(
                     "Switch camera on…",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                 )
             }
@@ -730,18 +736,18 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2A1A1A))
+                        .background(MaterialTheme.colorScheme.errorContainer)
                         .padding(16.dp),
                 ) {
                     Text(
                         text = uiState.errorMessage ?: "Unknown error",
-                        color = ColorRed,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                     )
                     Text(
                         text = "Disconnect the camera, ensure USB mode is PTP/MTP, then reconnect.",
-                        color = TextSecondary,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.75f),
                         fontSize = 11.sp,
                         textAlign = TextAlign.Center,
                     )
@@ -750,7 +756,7 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
             else -> {
                 Text(
                     text = "Connect the camera via USB-C OTG\nSet USB mode to PTP/MTP on camera",
-                    color = TextSecondary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,
                 )
@@ -775,8 +781,9 @@ private fun ShutterButton(
             modifier = Modifier.size(80.dp),
             shape = CircleShape,
             colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                disabledContainerColor = Color(0xFF2C2C2C),
+                containerColor = AccentYellow,
+                contentColor = Color(0xFF111111),
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             ),
             contentPadding = PaddingValues(0.dp),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
@@ -785,14 +792,14 @@ private fun ShutterButton(
                 countdown > 0 -> {
                     Text(
                         text = "$countdown",
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color(0xFF111111),
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Bold,
                     )
                 }
                 capturing -> {
                     CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
+                        color = Color(0xFF111111),
                         modifier = Modifier.size(22.dp),
                         strokeWidth = 2.dp,
                     )
@@ -803,8 +810,8 @@ private fun ShutterButton(
                             .size(34.dp)
                             .clip(CircleShape)
                             .background(
-                                if (enabled) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.25f)
-                                else Color(0xFF3A3A3A)
+                                if (enabled) Color(0xFF111111).copy(alpha = 0.2f)
+                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
                             ),
                     )
                 }
