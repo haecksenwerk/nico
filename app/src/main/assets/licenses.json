@@ -1,0 +1,17 @@
+[
+  { "name": "Kotlin", "license": "Apache 2.0" },
+  { "name": "Kotlin Serialization", "license": "Apache 2.0" },
+  { "name": "AndroidX Core KTX", "license": "Apache 2.0" },
+  { "name": "AndroidX Activity Compose", "license": "Apache 2.0" },
+  { "name": "AndroidX Lifecycle Runtime", "license": "Apache 2.0" },
+  { "name": "AndroidX Lifecycle ViewModel Compose", "license": "Apache 2.0" },
+  { "name": "AndroidX Navigation Compose", "license": "Apache 2.0" },
+  { "name": "AndroidX DataStore Preferences", "license": "Apache 2.0" },
+  { "name": "Jetpack Compose BOM", "license": "Apache 2.0" },
+  { "name": "Compose Material 3", "license": "Apache 2.0" },
+  { "name": "Compose Material Icons Extended", "license": "Apache 2.0" },
+  { "name": "Compose UI", "license": "Apache 2.0" },
+  { "name": "Material Color Utilities (materialkolor)", "license": "Apache 2.0" },
+  { "name": "Coil (coil-kt)", "license": "Apache 2.0" },
+  { "name": "OkIO", "license": "Apache 2.0" }
+]
