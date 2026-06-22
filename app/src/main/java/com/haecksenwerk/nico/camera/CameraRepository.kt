@@ -31,14 +31,12 @@ data class CameraProperties(
     val batteryLevel: Int = 0,
     val exposureProgramMode: Int = 0,  // 1=M 2=P 3=A 4=S 0x8010=AUTO (from 0x500E, read-only)
     val fNumber: Int = 0,              // f × 100 (280 = f/2.8)
-    val exposureTime: Long = 0,        // 0.0001 s units (50 = 1/200 s, read-only on Z series)
+    val nikonExposureTime: Long = 0,   // Nikon encoding (num<<16)|den from 0xD100 (display only)
     val isoValue: Long = 0,            // raw ISO number (read from 0x500F)
-    val exposureBias: Int = 0,         // EV × 1000 (INT16 from 0x5010)
+    val exposureBias: Int = 0,         // EV × 1000 (INT16 from 0x5010, display only)
     val whiteBalance: Int = 0,
     val meteringMode: Int = 0,         // 2=CW 3=Matrix 4=Spot 0x8010=HL-W
-    val focusMode: Int = 0,            // 0x500A value (for display only; read-only on Z series)
     val focusModeNikon: Int = 0,       // 0xD061 value: 0=AF-S, 1=AF-C, 4=MF (writable)
-    val autoIso: Boolean = false,      // 0xD054: true when Auto ISO is active on camera body
 )
 
 /**
@@ -146,6 +144,7 @@ class CameraRepository(private val usbManager: UsbManager) {
                 _cameraName.value = if (model.startsWith(makeWord, ignoreCase = true) || makeWord.isEmpty())
                     model else "$makeWord $model"
                 _state.value = ConnectionState.READY
+                startLiveView()
                 refreshProperties()
                 fetchAllEnumValues()
                 startPolling()
@@ -217,9 +216,9 @@ class CameraRepository(private val usbManager: UsbManager) {
             return
         }
         // Poll until camera is ready (up to 2 s)
-        repeat(20) {
+        for (i in 0 until 20) {
             delay(100L)
-            if (try { ptpMutex.withLock { s.deviceReady() } } catch (_: Exception) { false }) return@repeat
+            if (try { ptpMutex.withLock { s.deviceReady() } } catch (_: Exception) { false }) break
         }
         liveViewShouldRun = true
         liveViewJob?.cancel()
@@ -244,6 +243,7 @@ class CameraRepository(private val usbManager: UsbManager) {
         val s = session ?: return
         while (liveViewShouldRun) {
             if (_state.value == ConnectionState.CAPTURING) { delay(100L); continue }
+            val t0 = System.currentTimeMillis()
             val jpeg = try {
                 ptpMutex.withLock { s.getLiveViewImage() }
             } catch (e: Exception) {
@@ -255,19 +255,20 @@ class CameraRepository(private val usbManager: UsbManager) {
                 }
             }
             if (jpeg != null) _liveViewFrame.value = jpeg
+            // Yield for at least 100 ms so GetDevicePropDesc / SetDevicePropValue
+            // can acquire the mutex between frames without starvation.
+            val elapsed = System.currentTimeMillis() - t0
+            if (elapsed < 100L) delay(100L - elapsed)
         }
     }
 
     private suspend fun fetchAllEnumValues() {
         val s = session ?: return
         val settable = intArrayOf(
-            // 0x500E (Mode) and 0x500D (Shutter) omitted — read-only on Z series
             PtpConstants.PROP_F_NUMBER,
-            PtpConstants.PROP_NIKON_ISO_EX,           // 0xD0B4 instead of 0x500F
-            PtpConstants.PROP_EXPOSURE_BIAS,
             PtpConstants.PROP_WHITE_BALANCE,
             PtpConstants.PROP_EXPOSURE_METERING_MODE,
-            PtpConstants.PROP_NIKON_FOCUS_MODE,       // 0xD061 instead of 0x500A
+            PtpConstants.PROP_NIKON_FOCUS_MODE,
         )
         val result = mutableMapOf<Int, PropDescResult>()
         for (propCode in settable) {
@@ -292,8 +293,6 @@ class CameraRepository(private val usbManager: UsbManager) {
         _error.value = null
         _properties.value = when (propCode) {
             PtpConstants.PROP_F_NUMBER               -> _properties.value.copy(fNumber = value.toInt())
-            PtpConstants.PROP_NIKON_ISO_EX           -> _properties.value.copy(isoValue = value)
-            PtpConstants.PROP_EXPOSURE_BIAS          -> _properties.value.copy(exposureBias = value.toInt())
             PtpConstants.PROP_WHITE_BALANCE          -> _properties.value.copy(whiteBalance = value.toInt())
             PtpConstants.PROP_EXPOSURE_METERING_MODE -> _properties.value.copy(meteringMode = value.toInt())
             PtpConstants.PROP_NIKON_FOCUS_MODE       -> _properties.value.copy(focusModeNikon = value.toInt())
@@ -308,33 +307,26 @@ class CameraRepository(private val usbManager: UsbManager) {
         val battery    = tryGet(last.batteryLevel)        { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(PtpConstants.PROP_BATTERY_LEVEL)) } }
         val mode       = tryGet(last.exposureProgramMode) { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE)) } }
         val fNum       = tryGet(last.fNumber)             { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_F_NUMBER)) } }
-        val expTime    = tryGet(last.exposureTime)        { ptpMutex.withLock { s.decodeUint32(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_TIME)) } }
+        val nikonExpTime = tryGet(last.nikonExposureTime) { ptpMutex.withLock { s.decodeUint32(s.getDevicePropValue(PtpConstants.PROP_NIKON_EXPOSURE_TIME)) } }
         val iso        = tryGet(last.isoValue)            { ptpMutex.withLock { s.decodeUintFlex(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_INDEX)) } }
         val bias       = tryGet(last.exposureBias)        { ptpMutex.withLock { s.decodeIntFlex(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_BIAS)) } }
         val wb         = tryGet(last.whiteBalance)        { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_WHITE_BALANCE)) } }
         val metering   = tryGet(last.meteringMode)        { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_METERING_MODE)) } }
-        val focus      = tryGet(last.focusMode)           { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_FOCUS_MODE)) } }
         val focusNikon = tryGet(last.focusModeNikon) {
             withTimeoutOrNull(1000L) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(PtpConstants.PROP_NIKON_FOCUS_MODE)) } }
                 ?: last.focusModeNikon
-        }
-        val autoIsoVal = tryGet(0) {
-            withTimeoutOrNull(1000L) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(PtpConstants.PROP_NIKON_AUTO_ISO)) } }
-                ?: 0
         }
 
         _properties.value = CameraProperties(
             batteryLevel = battery,
             exposureProgramMode = mode,
             fNumber = fNum,
-            exposureTime = expTime,
+            nikonExposureTime = nikonExpTime,
             isoValue = iso,
             exposureBias = bias,
             whiteBalance = wb,
             meteringMode = metering,
-            focusMode = focus,
             focusModeNikon = focusNikon,
-            autoIso = autoIsoVal != 0,
         )
         _error.value = null
     }
@@ -387,8 +379,8 @@ class CameraRepository(private val usbManager: UsbManager) {
             PtpConstants.PROP_F_NUMBER -> current.copy(
                 fNumber = tryGet(current.fNumber) { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(propCode)) } }
             )
-            PtpConstants.PROP_EXPOSURE_TIME -> current.copy(
-                exposureTime = tryGet(current.exposureTime) { ptpMutex.withLock { s.decodeUint32(s.getDevicePropValue(propCode)) } }
+            PtpConstants.PROP_NIKON_EXPOSURE_TIME -> current.copy(
+                nikonExposureTime = tryGet(current.nikonExposureTime) { ptpMutex.withLock { s.decodeUint32(s.getDevicePropValue(propCode)) } }
             )
             PtpConstants.PROP_EXPOSURE_INDEX -> current.copy(
                 isoValue = tryGet(current.isoValue) { ptpMutex.withLock { s.decodeUintFlex(s.getDevicePropValue(propCode)) } }
@@ -405,14 +397,8 @@ class CameraRepository(private val usbManager: UsbManager) {
             PtpConstants.PROP_EXPOSURE_METERING_MODE -> current.copy(
                 meteringMode = tryGet(current.meteringMode) { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(propCode)) } }
             )
-            PtpConstants.PROP_FOCUS_MODE -> current.copy(
-                focusMode = tryGet(current.focusMode) { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(propCode)) } }
-            )
             PtpConstants.PROP_NIKON_FOCUS_MODE -> current.copy(
                 focusModeNikon = tryGet(current.focusModeNikon) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(propCode)) } }
-            )
-            PtpConstants.PROP_NIKON_AUTO_ISO -> current.copy(
-                autoIso = tryGet(0) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(propCode)) } } != 0
             )
             else -> return
         }

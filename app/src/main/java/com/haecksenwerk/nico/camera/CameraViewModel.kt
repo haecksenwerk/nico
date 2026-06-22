@@ -8,7 +8,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.haecksenwerk.nico.ptp.PtpConstants
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -84,7 +83,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             batteryLevel = props.batteryLevel,
             exposureModeDisplay = formatExposureMode(props.exposureProgramMode),
             fNumberDisplay = formatFNumber(props.fNumber),
-            shutterDisplay = formatShutter(props.exposureTime),
+            shutterDisplay = formatNikonShutter(props.nikonExposureTime),
             isoDisplay = formatIso(props.isoValue),
             exposureBiasDisplay = formatExposureBias(props.exposureBias),
             wbDisplay = formatWhiteBalance(props.whiteBalance),
@@ -95,18 +94,14 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             errorMessage = error,
             liveViewActive = lvActive,
             modeEdit     = EditableProperty(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE),  // read-only on Z series
-            isoEdit      = if (!props.autoIso)
-                buildEditable(PtpConstants.PROP_NIKON_ISO_EX, props.isoValue, propEnums) { formatIso(it) }
-            else EditableProperty(PtpConstants.PROP_NIKON_ISO_EX),
+            isoEdit      = EditableProperty(PtpConstants.PROP_NIKON_ISO_EX),
             focusEdit    = buildEditable(PtpConstants.PROP_NIKON_FOCUS_MODE,       props.focusModeNikon.toLong(),       propEnums) { formatFocusModeNikon(it) },
             wbEdit       = buildEditable(PtpConstants.PROP_WHITE_BALANCE,          props.whiteBalance.toLong(),         propEnums) { formatWhiteBalance(it.toInt()) },
             apertureEdit = if (props.exposureProgramMode == 1 || props.exposureProgramMode == 3)
                 buildEditable(PtpConstants.PROP_F_NUMBER, props.fNumber.toLong(), propEnums) { formatFNumber(it.toInt()) }
             else EditableProperty(PtpConstants.PROP_F_NUMBER),
-            shutterEdit  = EditableProperty(PtpConstants.PROP_EXPOSURE_TIME),          // read-only on Z series
-            evCompEdit   = if (props.exposureProgramMode != 1 || props.autoIso)
-                buildEditable(PtpConstants.PROP_EXPOSURE_BIAS, props.exposureBias.toLong(), propEnums) { formatExposureBias(it.toInt()) }
-            else EditableProperty(PtpConstants.PROP_EXPOSURE_BIAS),
+            shutterEdit  = EditableProperty(PtpConstants.PROP_NIKON_EXPOSURE_TIME),
+            evCompEdit   = EditableProperty(PtpConstants.PROP_EXPOSURE_BIAS),
             meteringEdit = buildEditable(PtpConstants.PROP_EXPOSURE_METERING_MODE, props.meteringMode.toLong(),         propEnums) { formatMetering(it.toInt()) },
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CameraUiState())
@@ -163,14 +158,19 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         return "f/$whole.$tenth"
     }
 
-    // PTP ExposureTime (0x500D) is in units of 0.0001 s, NOT a denominator.
-    // 1/200 s is stored as 50  (50 × 0.0001 = 0.005 s)
-    // 1/60 s  is stored as 167 (167 × 0.0001 ≈ 1/60 s)
-    // 0xFFFFFFFF is the Bulb sentinel used by some Nikon bodies.
-    private fun formatShutter(raw: Long): String = when {
-        raw == 0L || raw == 0xFFFFFFFFL -> "--"
-        raw >= 10_000L -> "${raw / 10_000}\""
-        else -> "1/${(10_000.0 / raw).roundToInt()}"
+    // Nikon 0xD100 shutter encoding: high 16 bits = numerator, low 16 bits = denominator.
+    // e.g. 1/200 s → (1<<16)|200; 30 s → (30<<16)|1; Bulb → 0xFFFFFFFF.
+    private fun formatNikonShutter(raw: Long): String {
+        val num = ((raw shr 16) and 0xFFFF).toInt()
+        val den = (raw and 0xFFFF).toInt()
+        return when {
+            raw == 0L           -> "--"
+            raw == 0xFFFFFFFFL  -> "Bulb"
+            raw == 0xFFFFFFFEL  -> "x200"
+            raw == 0xFFFFFFFDL  -> "T"
+            den == 1            -> "${num}\""
+            else                -> "1/$den"
+        }
     }
 
     private fun formatIso(iso: Long): String =
@@ -208,14 +208,6 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         else   -> if (mode == 0) "--" else "M$mode"
     }
 
-    private fun formatFocusMode(mode: Int): String = when (mode) {
-        1      -> "MF"
-        0x8010 -> "AF-S"
-        0x8011 -> "AF-C"
-        0x8012 -> "AF-A"
-        else   -> if (mode == 0) "--" else "F$mode"
-    }
-
     private fun formatFocusModeNikon(raw: Long): String = when (raw.toInt()) {
         0 -> "AF-S"
         1 -> "AF-C"
@@ -230,6 +222,10 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         0x0006 -> "Tungsten"
         0x0007 -> "Flash"
         0x8010 -> "Cloudy"
+        0x8011 -> "Shade"
+        0x8012 -> "Choose"
+        0x8013 -> "Preset"
+        0x8016 -> "Neutral"
         else -> if (wb == 0) "--" else "WB $wb"
     }
 
