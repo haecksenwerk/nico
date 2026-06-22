@@ -21,7 +21,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 2
-        versionName = "1.01"
+        versionName = "1.0.1"
         buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
