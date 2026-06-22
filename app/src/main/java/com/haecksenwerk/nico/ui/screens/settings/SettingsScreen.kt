@@ -13,7 +13,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,20 +28,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.haecksenwerk.nico.domain.ThemeColor
 import com.haecksenwerk.nico.domain.ThemeMode
 import com.haecksenwerk.nico.ui.theme.CUSTOM_SWATCH_COLORS
 import com.haecksenwerk.nico.ui.theme.isEffectiveDarkTheme
-
-private data class LanguageOption(val code: String, val nativeName: String, val displayName: String)
-
-private val SUPPORTED_LANGUAGES = listOf(
-    LanguageOption("system", "System", "System language"),
-    LanguageOption("en", "English", "English"),
-    LanguageOption("de", "Deutsch", "German"),
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -53,7 +43,6 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val isDarkThemeActive = isEffectiveDarkTheme(settings.themeMode)
-    val showLanguageDialog = remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -79,7 +68,7 @@ fun SettingsScreen(
                 SettingsCard {
                     SwitchRow(
                         title = "Format badges",
-                        subtitle = "Show NEF / JPG label on thumbnails",
+                        subtitle = "Show RAW/JPG label on thumbnails",
                         checked = settings.showFormatBadges,
                         onCheckedChange = { viewModel.setShowFormatBadges(it) },
                         leadingIcon = {
@@ -198,30 +187,6 @@ fun SettingsScreen(
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
-
-                SettingsCard {
-                    val langOption = SUPPORTED_LANGUAGES.firstOrNull { it.code == settings.language }
-                    val langDisplay = langOption?.nativeName ?: "System language"
-                    ClickableRow(
-                        title = "Language",
-                        subtitle = langDisplay,
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Translate,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        onClick = { showLanguageDialog.value = true },
-                        trailingContent = {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                    )
-                }
             }
 
             // ─── About ────────────────────────────────────────────────────────
@@ -249,17 +214,6 @@ fun SettingsScreen(
                 }
             }
         }
-    }
-
-    if (showLanguageDialog.value) {
-        LanguagePickerDialog(
-            selected = settings.language,
-            onSelect = { code ->
-                viewModel.setLanguage(code)
-                showLanguageDialog.value = false
-            },
-            onDismiss = { showLanguageDialog.value = false },
-        )
     }
 }
 
@@ -323,42 +277,4 @@ private fun ColorSwatchRow(
             }
         }
     }
-}
-
-// ─── Language picker dialog ───────────────────────────────────────────────────
-
-@Composable
-private fun LanguagePickerDialog(
-    selected: String,
-    onSelect: (String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Select language") },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-        text = {
-            LazyColumn {
-                items(SUPPORTED_LANGUAGES) { lang ->
-                    ListItem(
-                        headlineContent = { Text(lang.nativeName) },
-                        supportingContent = if (lang.nativeName != lang.displayName) {
-                            { Text(lang.displayName) }
-                        } else null,
-                        leadingContent = {
-                            RadioButton(selected = lang.code == selected, onClick = null)
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                        ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onSelect(lang.code) },
-                    )
-                }
-            }
-        },
-    )
 }
