@@ -82,9 +82,6 @@ class BrowserViewModel(
                 val fmtSummary = all.groupBy { "0x${it.objectFormat.toString(16)}" }
                     .entries.joinToString { "${it.key}×${it.value.size}" }
                     .ifEmpty { "none" }
-                Log.d(TAG, "listImages: ${all.size} objects  formats: $fmtSummary")
-                all.forEach { Log.d(TAG, "  handle=${it.handle} fmt=0x${it.objectFormat.toString(16)} ${it.filename}") }
-
                 val sorted = all.sortedByDescending { it.captureDate }
                 sorted to "${all.size} objects (formats: $fmtSummary)"
             }
@@ -176,10 +173,7 @@ class BrowserViewModel(
     }
 
     private suspend fun downloadSingle(info: PtpObjectInfo) {
-        if (info.filename in _downloadedFilenames.value) {
-            Log.d(TAG, "downloadSingle: skipping ${info.filename} (already on device)")
-            return
-        }
+        if (info.filename in _downloadedFilenames.value) return
         val mimeType = if (info.filename.isJpeg()) "image/jpeg" else "image/x-nikon-nef"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -217,7 +211,7 @@ class BrowserViewModel(
     private fun queryDownloadedFilenames(): Set<String> {
         val result = mutableSetOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val projection = arrayOf(MediaStore.Images.Media.DISPLAY_NAME, MediaStore.Images.Media.RELATIVE_PATH)
+            val projection = arrayOf(MediaStore.Images.Media.DISPLAY_NAME)
             // LIKE handles both "Pictures/nico" and "Pictures/nico/" (MediaStore normalisation varies)
             val selection = "${MediaStore.Images.Media.RELATIVE_PATH} LIKE ?"
             context.contentResolver.query(
@@ -228,21 +222,16 @@ class BrowserViewModel(
                 null,
             )?.use { cursor ->
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-                val pathCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
                 while (cursor.moveToNext()) {
-                    val name = cursor.getString(nameCol)
-                    val path = cursor.getString(pathCol)
-                    Log.d(TAG, "queryDownloaded: path=$path name=$name")
-                    result.add(name)
+                    result.add(cursor.getString(nameCol))
                 }
-            } ?: Log.w(TAG, "queryDownloaded: ContentResolver.query returned null")
+            }
         } else {
             File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
                 "nico",
             ).listFiles()?.forEach { result.add(it.name) }
         }
-        Log.d(TAG, "queryDownloaded: ${result.size} files found")
         return result
     }
 
