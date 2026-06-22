@@ -1,18 +1,18 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="N I C O">
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="N I C O"><br>
+  <strong>N &nbsp; I &nbsp; C &nbsp; O</strong>
 </p>
 
 <br />
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&nbsp;
 [![Release](https://img.shields.io/github/v/release/haecksenwerk/nico)](https://github.com/haecksenwerk/nico/releases/latest)&nbsp;
-[![Ko-Fi](https://img.shields.io/badge/Ko--fi-Support%20this%20project-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/haecksenwerk)&nbsp;
 
 <br />
 
-**N I C O** - an Android app for controlling Nikon Z-Series cameras.
+An Android app for controlling Nikon Z-series cameras directly over a USB cable, without the hassle of a BLE or Wi-Fi connection.
 
-Control your Nikon camera over USB (PTP/OTG) directly from your Android device. Built with Kotlin and Jetpack Compose (Material 3).
+Built with Kotlin and Jetpack Compose (Material 3).
 
 The app has been tested exclusively on a Google Pixel 9 using a Nikon Z fc. While other Nikon Z models should be compatible, certain functions may vary by camera model. 
 Additionally, please ensure your Android device supports USB-OTG mode.
@@ -30,6 +30,12 @@ The easiest way to install and keep nico up to date is via [Obtainium](https://g
 
 ```
 https://github.com/haecksenwerk/nico
+```
+
+The app‑signing certificate hash is shown in the Obtainium info screen for radioMii. Check if it is identical to the SHA‑256 fingerprint:
+
+```
+88:CF:E4:BF:74:80:E7:BC:7B:CC:37:64:B1:73:5B:8E:B9:A1:99:2D:A9:7F:08:4A:FD:47:9C:41:ED:4F:7D:B8
 ```
 
 <br />
