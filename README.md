@@ -17,9 +17,12 @@ Built with Kotlin and Jetpack Compose (Material 3).
 The app has been tested exclusively on a Google Pixel 9 using a Nikon Z fc. While other Nikon Z models should be compatible, certain functions may vary by camera model. 
 Additionally, please ensure your Android device supports USB-OTG mode.
 
+<br />
+<br />
+
 <p align="center">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/main.png"     width="30%" alt="Main screen">
-  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/browser.png"  width="30%" alt="Browser">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/main.png"     width="30%" alt="Main screen">&nbsp;&nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/browser.png"  width="30%" alt="Browser">&nbsp;&nbsp;
   <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/settings.png" width="30%" alt="Settings">
 </p>
 
