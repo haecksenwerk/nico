@@ -8,12 +8,21 @@ android {
     namespace = "com.haecksenwerk.nico"
     compileSdk = 37
 
+    val gitHash = try {
+        providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+        }.standardOutput.asText.get().trim()
+    } catch (e: Exception) {
+        "unknown"
+    }
+
     defaultConfig {
         applicationId = "com.haecksenwerk.nico"
         minSdk = 24
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
+        buildConfigField("String", "GIT_HASH", "\"$gitHash\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -31,6 +40,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 

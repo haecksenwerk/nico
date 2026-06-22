@@ -13,7 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Gavel
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,10 +24,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import coil3.compose.AsyncImage
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.haecksenwerk.nico.BuildConfig
+import com.haecksenwerk.nico.R
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -37,13 +41,6 @@ fun AppInfoScreen(
     onNavigateToLicenses: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
-    val version = remember {
-        runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrDefault("1.0")
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -86,10 +83,9 @@ fun AppInfoScreen(
                 }
             }
 
-            Icon(
-                imageVector = Icons.Default.PhotoCamera,
-                contentDescription = "NICO",
-                tint = MaterialTheme.colorScheme.primary,
+            AsyncImage(
+                model = R.mipmap.ic_launcher_round,
+                contentDescription = "N I C O",
                 modifier = Modifier
                     .size(140.dp)
                     .graphicsLayer {
@@ -128,7 +124,7 @@ fun AppInfoScreen(
                 InfoRow(
                     icon = Icons.AutoMirrored.Filled.Label,
                     label = "Version",
-                    value = version ?: "1.0",
+                    value = "${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_HASH})",
                 )
                 InfoRow(
                     icon = Icons.Default.Person,
