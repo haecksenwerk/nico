@@ -1,13 +1,14 @@
 package com.haecksenwerk.nico.browser
 
+import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
-import android.media.ExifInterface
 import android.util.Log
 import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.exifinterface.media.ExifInterface
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -16,7 +17,6 @@ import coil3.key.Keyer
 import coil3.memory.MemoryCache
 import com.haecksenwerk.nico.camera.CameraRepository
 import com.haecksenwerk.nico.camera.ConnectionState
-import com.haecksenwerk.nico.ptp.PtpConstants
 import com.haecksenwerk.nico.ptp.PtpObjectInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,8 +38,16 @@ data class ExifData(
 data class PreviewResult(
     val imageBytes: ByteArray?,
     val exifData: ExifData?,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is PreviewResult) return false
+        return imageBytes.contentEquals(other.imageBytes) && exifData == other.exifData
+    }
+    override fun hashCode(): Int = 31 * (imageBytes?.contentHashCode() ?: 0) + (exifData?.hashCode() ?: 0)
+}
 
+@SuppressLint("StaticFieldLeak")
 class BrowserViewModel(
     private val context: Context,
     private val repository: CameraRepository,
@@ -112,10 +120,6 @@ class BrowserViewModel(
         _selectedHandles.update { current ->
             if (handle in current) current - handle else current + handle
         }
-    }
-
-    fun clearSelection() {
-        _selectedHandles.value = emptySet()
     }
 
     /**
@@ -192,7 +196,7 @@ class BrowserViewModel(
                     if (size > bestSize) { bestStart = soiAt; bestSize = size }
                     i = eoiAt + 2
                 } else {
-                    if (fallbackStart < 0) fallbackStart = soiAt
+                    fallbackStart = soiAt
                     break
                 }
             } else {

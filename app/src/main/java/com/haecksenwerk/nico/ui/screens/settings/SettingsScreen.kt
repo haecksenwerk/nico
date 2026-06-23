@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
@@ -96,7 +97,7 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.setShowFormatBadges(it) },
                         leadingIcon = {
                             Icon(
-                                imageVector = Icons.Default.Label,
+                                imageVector = Icons.AutoMirrored.Filled.Label,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

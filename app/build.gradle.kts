@@ -12,7 +12,7 @@ android {
         providers.exec {
             commandLine("git", "rev-parse", "--short", "HEAD")
         }.standardOutput.asText.get().trim()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         "unknown"
     }
 
@@ -92,6 +92,7 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.material.color.utilities)
     implementation(libs.coil3.compose)
+    implementation(libs.androidx.exifinterface)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

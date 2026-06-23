@@ -22,7 +22,6 @@ class SettingsViewModel(private val store: SettingsDataStore) : ViewModel() {
     fun setThemeColor(color: ThemeColor) = viewModelScope.launch { store.setThemeColor(color) }
     fun setCustomColorIndex(index: Int) = viewModelScope.launch { store.setCustomColorIndex(index) }
     fun setTrueBlack(enabled: Boolean) = viewModelScope.launch { store.setTrueBlack(enabled) }
-    fun setLanguage(lang: String) = viewModelScope.launch { store.setLanguage(lang) }
     fun setLiveViewOnConnect(enabled: Boolean) = viewModelScope.launch { store.setLiveViewOnConnect(enabled) }
     fun setShowFormatBadges(enabled: Boolean) = viewModelScope.launch { store.setShowFormatBadges(enabled) }
 

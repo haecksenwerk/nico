@@ -14,6 +14,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -108,7 +110,7 @@ class CameraRepository(private val usbManager: UsbManager) {
             return
         }
 
-        delay(800L)   // USB settle time
+        delay(800.milliseconds)   // USB settle time
 
         val t = PtpTransport(usbManager, device)
         if (!withContext(Dispatchers.IO) { t.open() }) {
@@ -137,12 +139,12 @@ class CameraRepository(private val usbManager: UsbManager) {
                 val cameraOn = ptpMutex.withLock { s.deviceReady() }
                 if (!cameraOn) {
                     ptpMutex.withLock { try { s.closeSession() } catch (_: Exception) {} }
-                    if (_state.value == ConnectionState.USB_CONNECTED) delay(2000L)
+                    if (_state.value == ConnectionState.USB_CONNECTED) delay(2.seconds)
                     continue
                 }
 
                 session = s
-                delay(400L)
+                delay(400.milliseconds)
 
                 val (make, model) = ptpMutex.withLock { s.getDeviceMakeModel() }
                 // Use first word of manufacturer to avoid "NIKON CORPORATION Z fc";
@@ -158,7 +160,7 @@ class CameraRepository(private val usbManager: UsbManager) {
                 return
             } catch (_: Exception) {
                 session = null
-                if (_state.value == ConnectionState.USB_CONNECTED) delay(2000L)
+                if (_state.value == ConnectionState.USB_CONNECTED) delay(2.seconds)
             }
         }
     }
@@ -223,8 +225,8 @@ class CameraRepository(private val usbManager: UsbManager) {
             return
         }
         // Poll until camera is ready (up to 2 s)
-        for (i in 0 until 20) {
-            delay(100L)
+        for (attempt in 0 until 20) {
+            delay(100.milliseconds)
             if (try { ptpMutex.withLock { s.deviceReady() } } catch (_: Exception) { false }) break
         }
         liveViewShouldRun = true
@@ -237,7 +239,7 @@ class CameraRepository(private val usbManager: UsbManager) {
         // before we send EndLiveView. Hard-cancelling mid-transfer would leave
         // stale data in the USB IN endpoint, breaking subsequent commands.
         liveViewShouldRun = false
-        withTimeoutOrNull(2000L) { liveViewJob?.join() }
+        withTimeoutOrNull(2.seconds) { liveViewJob?.join() }
         liveViewJob?.cancel()
         liveViewJob = null
         val s = session
@@ -249,7 +251,7 @@ class CameraRepository(private val usbManager: UsbManager) {
     private suspend fun liveViewLoop() {
         val s = session ?: return
         while (liveViewShouldRun) {
-            if (_state.value == ConnectionState.CAPTURING) { delay(100L); continue }
+            if (_state.value == ConnectionState.CAPTURING) { delay(100.milliseconds); continue }
             val t0 = System.currentTimeMillis()
             val jpeg = try {
                 ptpMutex.withLock { s.getLiveViewImage() }
@@ -257,15 +259,15 @@ class CameraRepository(private val usbManager: UsbManager) {
                 val msg = e.message ?: ""
                 when {
                     "NotLiveView" in msg -> { _liveViewActive.value = false; return }
-                    "DeviceBusy" in msg -> { delay(10L); continue }
-                    else -> { delay(50L); continue }
+                    "DeviceBusy" in msg -> { delay(10.milliseconds); continue }
+                    else -> { delay(50.milliseconds); continue }
                 }
             }
             if (jpeg != null) _liveViewFrame.value = jpeg
             // Yield for at least 100 ms so GetDevicePropDesc / SetDevicePropValue
             // can acquire the mutex between frames without starvation.
             val elapsed = System.currentTimeMillis() - t0
-            if (elapsed < 100L) delay(100L - elapsed)
+            if (elapsed < 100L) delay((100L - elapsed).milliseconds)
         }
     }
 
@@ -320,7 +322,7 @@ class CameraRepository(private val usbManager: UsbManager) {
         val wb         = tryGet(last.whiteBalance)        { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_WHITE_BALANCE)) } }
         val metering   = tryGet(last.meteringMode)        { ptpMutex.withLock { s.decodeUint16(s.getDevicePropValue(PtpConstants.PROP_EXPOSURE_METERING_MODE)) } }
         val focusNikon = tryGet(last.focusModeNikon) {
-            withTimeoutOrNull(1000L) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(PtpConstants.PROP_NIKON_FOCUS_MODE)) } }
+            withTimeoutOrNull(1.seconds) { ptpMutex.withLock { s.decodeUint8(s.getDevicePropValue(PtpConstants.PROP_NIKON_FOCUS_MODE)) } }
                 ?: last.focusModeNikon
         }
 
@@ -352,7 +354,7 @@ class CameraRepository(private val usbManager: UsbManager) {
 
     private suspend fun pollLoop() {
         while (_state.value == ConnectionState.READY || _state.value == ConnectionState.CAPTURING) {
-            delay(500L)
+            delay(500.milliseconds)
             val s = session ?: return
 
             // Skip event poll while the shutter is open — the camera is busy and
@@ -420,12 +422,6 @@ class CameraRepository(private val usbManager: UsbManager) {
         return ptpMutex.withLock { s.listImages() }
     }
 
-    // Returns null on per-object errors (object may have been deleted, etc.)
-    suspend fun getObjectInfo(handle: Long): PtpObjectInfo? {
-        val s = session ?: return null
-        return try { ptpMutex.withLock { s.getObjectInfo(handle) } } catch (_: Exception) { null }
-    }
-
     // Returns null when thumb is unavailable; Coil will show a placeholder.
     suspend fun getThumb(handle: Long): ByteArray? {
         thumbCache[handle]?.let { return it }
@@ -445,12 +441,6 @@ class CameraRepository(private val usbManager: UsbManager) {
     suspend fun downloadObject(handle: Long, out: OutputStream) {
         val s = session ?: return
         ptpMutex.withLock { s.downloadObject(handle, out) }
-    }
-
-    suspend fun deleteObject(handle: Long) {
-        val s = session ?: return
-        ptpMutex.withLock { s.requireOk(s.deleteObject(handle), "DeleteObject($handle)") }
-        thumbCache.remove(handle)
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
