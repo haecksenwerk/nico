@@ -63,6 +63,7 @@ class BrowserViewModel(
                     ConnectionState.IDLE, ConnectionState.USB_CONNECTED, ConnectionState.ERROR -> {
                         _uiState.value = BrowserUiState.NoCamera
                         _selectedHandles.value = emptySet()
+                        imageLoader.memoryCache?.clear()
                     }
                     else -> {}
                 }

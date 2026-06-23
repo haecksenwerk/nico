@@ -82,7 +82,10 @@ class CameraRepository(private val usbManager: UsbManager) {
     // Raw JPEG bytes for each thumbnail keyed by object handle.
     // Avoids repeated USB round-trips for the same thumbnail (e.g. when Coil
     // evicts a decoded Bitmap from its memory cache and needs to re-decode).
-    private val thumbCache = android.util.LruCache<Long, ByteArray>(300)
+    // Byte-bounded so the cache size tracks actual memory rather than entry count.
+    private val thumbCache = object : android.util.LruCache<Long, ByteArray>(8 * 1024 * 1024) {
+        override fun sizeOf(key: Long, value: ByteArray) = value.size
+    }
 
     // ── Connection lifecycle ──────────────────────────────────────────────────
 
