@@ -2,6 +2,7 @@ package com.haecksenwerk.nico.browser
 
 import android.content.ContentValues
 import android.content.Context
+import android.media.ExifInterface
 import android.util.Log
 import android.media.MediaScannerConnection
 import android.os.Build
@@ -25,6 +26,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.roundToInt
+
+data class ExifData(
+    val shutterDisplay: String?,
+    val apertureDisplay: String?,
+    val focalLengthDisplay: String?,
+    val isoDisplay: String?,
+)
+
+data class PreviewResult(
+    val imageBytes: ByteArray?,
+    val exifData: ExifData?,
+)
 
 class BrowserViewModel(
     private val context: Context,
@@ -105,14 +119,48 @@ class BrowserViewModel(
     }
 
     /**
-     * Loads a preview for the detail view.
-     * JPEG files: returns the file data directly (partial or full).
-     * NEF files: fetches the first 512 KB and scans for an embedded JPEG.
+     * Loads a preview and EXIF metadata for the detail view.
+     * The same 4 MB fetch covers both: EXIF IFDs are always at the start of JPEG/NEF,
+     * and for NEF the embedded JPEG preview is within the first few MB.
      */
-    suspend fun getPreview(handle: Long, filename: String): ByteArray? = withContext(Dispatchers.IO) {
-        // 4 MB covers any embedded JPEG preview; large-scene NEFs can have previews > 1 MB.
-        val data = repository.getPartialObject(handle, 0L, 4L * 1024 * 1024) ?: return@withContext null
-        if (filename.isJpeg()) data else extractLargestJpeg(data)
+    suspend fun getPreview(handle: Long, filename: String): PreviewResult = withContext(Dispatchers.IO) {
+        val data = repository.getPartialObject(handle, 0L, 4L * 1024 * 1024)
+            ?: return@withContext PreviewResult(null, null)
+        val imageBytes = if (filename.isJpeg()) data else extractLargestJpeg(data)
+        val exifData = parseExif(data)
+        PreviewResult(imageBytes, exifData)
+    }
+
+    private fun parseExif(data: ByteArray): ExifData? {
+        return try {
+            val exif = ExifInterface(data.inputStream())
+            val shutterSec = exif.getAttributeDouble(ExifInterface.TAG_EXPOSURE_TIME, 0.0)
+            val aperture = exif.getAttributeDouble(ExifInterface.TAG_F_NUMBER, 0.0)
+            val focalMm = exif.getAttributeDouble(ExifInterface.TAG_FOCAL_LENGTH, 0.0)
+            @Suppress("DEPRECATION")
+            val iso = exif.getAttributeInt(ExifInterface.TAG_ISO_SPEED_RATINGS, 0)
+
+            val shutterDisplay = if (shutterSec > 0) formatExposureTime(shutterSec) else null
+            val apertureDisplay = if (aperture > 0) "f/${formatFNumber(aperture)}" else null
+            val focalDisplay = if (focalMm > 0) "${focalMm.roundToInt()}mm" else null
+            val isoDisplay = if (iso > 0) "ISO $iso" else null
+
+            if (shutterDisplay == null && apertureDisplay == null && focalDisplay == null && isoDisplay == null)
+                null
+            else
+                ExifData(shutterDisplay, apertureDisplay, focalDisplay, isoDisplay)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun formatExposureTime(seconds: Double): String {
+        return if (seconds >= 1.0) "${seconds.roundToInt()}s" else "1/${(1.0 / seconds).roundToInt()}s"
+    }
+
+    private fun formatFNumber(value: Double): String {
+        val tenths = (value * 10).roundToInt()
+        return if (tenths % 10 == 0) "${tenths / 10}" else "${tenths / 10}.${tenths % 10}"
     }
 
     /**
