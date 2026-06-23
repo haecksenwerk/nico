@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 import com.haecksenwerk.nico.browser.BrowserViewModel
 import com.haecksenwerk.nico.camera.CameraRepository
 import com.haecksenwerk.nico.camera.CameraViewModel
@@ -85,6 +89,14 @@ class MainActivity : ComponentActivity() {
             usbManager.deviceList.values
                 .firstOrNull { it.isNikon() }
                 ?.let { requestPermissionOrConnect(it) }
+        }
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                settingsViewModel.settings.collect { settings ->
+                    repository.liveViewOnConnect = settings.liveViewOnConnect
+                }
+            }
         }
 
         setContent {

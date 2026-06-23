@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.map
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "nico_settings")
 
 private object Keys {
+    val LIVE_VIEW_ON_CONNECT = booleanPreferencesKey("live_view_on_connect")
     val THEME_MODE = stringPreferencesKey("theme_mode")
     val THEME_COLOR = stringPreferencesKey("theme_color")
     val CUSTOM_COLOR_INDEX = intPreferencesKey("custom_color_index")
@@ -25,6 +26,7 @@ class SettingsDataStore(private val context: Context) {
 
     val settingsFlow: Flow<NicoSettings> = context.dataStore.data.map { prefs ->
         NicoSettings(
+            liveViewOnConnect = prefs[Keys.LIVE_VIEW_ON_CONNECT] ?: false,
             themeMode = runCatching { ThemeMode.valueOf(prefs[Keys.THEME_MODE] ?: "") }
                 .getOrDefault(ThemeMode.SYSTEM),
             themeColor = runCatching { ThemeColor.valueOf(prefs[Keys.THEME_COLOR] ?: "") }
@@ -50,6 +52,9 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setLanguage(lang: String) =
         context.dataStore.edit { it[Keys.LANGUAGE] = lang }
+
+    suspend fun setLiveViewOnConnect(enabled: Boolean) =
+        context.dataStore.edit { it[Keys.LIVE_VIEW_ON_CONNECT] = enabled }
 
     suspend fun setShowFormatBadges(enabled: Boolean) =
         context.dataStore.edit { it[Keys.SHOW_FORMAT_BADGES] = enabled }

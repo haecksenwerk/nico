@@ -4,6 +4,7 @@ enum class ThemeMode { LIGHT, DARK, SYSTEM }
 enum class ThemeColor { NICO, DYNAMIC, CUSTOM }
 
 data class NicoSettings(
+    val liveViewOnConnect: Boolean = false,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val themeColor: ThemeColor = ThemeColor.NICO,
     val customSourceColorIndex: Int = 4,

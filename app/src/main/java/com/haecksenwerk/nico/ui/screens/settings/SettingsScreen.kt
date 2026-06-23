@@ -61,6 +61,29 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
+            // ─── Camera ───────────────────────────────────────────────────────
+            item {
+                SectionHeader(title = "Camera")
+
+                SettingsCard {
+                    SwitchRow(
+                        title = "Live view on connect",
+                        subtitle = "Start camera preview automatically when connecting",
+                        checked = settings.liveViewOnConnect,
+                        onCheckedChange = { viewModel.setLiveViewOnConnect(it) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Videocam,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             // ─── Photos ───────────────────────────────────────────────────────
             item {
                 SectionHeader(title = "Photos")

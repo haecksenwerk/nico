@@ -79,6 +79,10 @@ class CameraRepository(private val usbManager: UsbManager) {
     private var liveViewJob: Job? = null
     @Volatile private var liveViewShouldRun = false
 
+    // Controls whether live view is started automatically when the camera becomes ready.
+    // Updated by MainActivity from the settings flow.
+    @Volatile var liveViewOnConnect: Boolean = false
+
     // Raw JPEG bytes for each thumbnail keyed by object handle.
     // Avoids repeated USB round-trips for the same thumbnail (e.g. when Coil
     // evicts a decoded Bitmap from its memory cache and needs to re-decode).
@@ -147,7 +151,7 @@ class CameraRepository(private val usbManager: UsbManager) {
                 _cameraName.value = if (model.startsWith(makeWord, ignoreCase = true) || makeWord.isEmpty())
                     model else "$makeWord $model"
                 _state.value = ConnectionState.READY
-                startLiveView()
+                if (liveViewOnConnect) startLiveView()
                 refreshProperties()
                 fetchAllEnumValues()
                 startPolling()
