@@ -32,12 +32,13 @@ object PtpConstants {
     // Nikon vendor extension codes
     const val OP_NIKON_GET_EVENT = 0x90C7   // data-in: packed event list
     const val OP_NIKON_DEVICE_READY = 0x90C8
-    const val OP_NIKON_AF_DRIVE = 0x90CC
+    const val OP_NIKON_AF_DRIVE = 0x90C1  // PTP_OC_NIKON_AfDrive — no params, no data
     const val OP_NIKON_START_LIVEVIEW = 0x9201
     const val OP_NIKON_END_LIVEVIEW = 0x9202
     const val OP_NIKON_GET_LIVEVIEW_IMG = 0x9203
 
     const val RC_NIKON_NOT_LIVEVIEW = 0xA00B
+    const val RC_NIKON_OUT_OF_FOCUS = 0xA002  // returned by DeviceReady after AfDrive if AF failed
 
     // Response codes
     const val RC_OK = 0x2001

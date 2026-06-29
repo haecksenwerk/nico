@@ -109,6 +109,7 @@ class MainActivity : ComponentActivity() {
                     uiState = uiState,
                     liveViewBitmap = liveViewBitmap,
                     onCaptureClicked = viewModel::onCaptureClicked,
+                    onFocusClicked = viewModel::onFocusClicked,
                     onDelaySelected = viewModel::onDelaySelected,
                     onPropertySelected = viewModel::onPropertySelected,
                     onLiveViewToggle = viewModel::onLiveViewToggle,

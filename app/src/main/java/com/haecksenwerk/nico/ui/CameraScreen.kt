@@ -70,6 +70,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.haecksenwerk.nico.camera.CameraUiState
 import com.haecksenwerk.nico.camera.ConnectionState
 import com.haecksenwerk.nico.camera.EditableProperty
+import com.haecksenwerk.nico.camera.FocusState
 import com.haecksenwerk.nico.ui.theme.NicoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -78,9 +79,11 @@ import kotlin.math.roundToInt
 // Surface and text colours are resolved from MaterialTheme.colorScheme at each
 // call site so they adapt automatically to dark/light and the user's chosen theme.
 
-private val AccentYellow = Color(0xFFFFCC00)
-private val ColorGreen   = Color(0xFF4CAF50)
-private val ColorRed     = Color(0xFFEF5350)
+private val AccentYellow  = Color(0xFFFFCC00)
+private val ColorGreen    = Color(0xFF4CAF50)
+private val ColorRed      = Color(0xFFEF5350)
+private val PastelRed     = Color(0xFFEF9A9A)
+private val PastelGreen   = Color(0xFFA5D6A7)
 
 private val RELEASE_DELAYS = listOf(0, 2, 5, 10)
 
@@ -91,6 +94,7 @@ fun CameraScreen(
     uiState: CameraUiState,
     liveViewBitmap: ImageBitmap?,
     onCaptureClicked: () -> Unit,
+    onFocusClicked: () -> Unit,
     onDelaySelected: (Int) -> Unit,
     onPropertySelected: (propCode: Int, index: Int) -> Unit,
     onLiveViewToggle: () -> Unit,
@@ -153,12 +157,29 @@ fun CameraScreen(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                 )
             }
-            ShutterButton(
-                enabled = uiState.connectionState == ConnectionState.READY,
-                capturing = uiState.connectionState == ConnectionState.CAPTURING,
-                countdown = uiState.captureCountdown,
-                onClick = onCaptureClicked,
-            )
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // Focus button: horizontally centred in the left half, which puts it
+                // midway between the left screen border and the shutter button centre.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.27f)
+                        .align(Alignment.CenterStart),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    FocusButton(
+                        enabled = uiState.connectionState == ConnectionState.READY,
+                        focusState = uiState.focusState,
+                        onClick = onFocusClicked,
+                    )
+                }
+                ShutterButton(
+                    enabled = uiState.connectionState == ConnectionState.READY,
+                    capturing = uiState.connectionState == ConnectionState.CAPTURING,
+                    countdown = uiState.captureCountdown,
+                    onClick = onCaptureClicked,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -765,6 +786,44 @@ private fun IdlePanel(uiState: CameraUiState, modifier: Modifier = Modifier) {
     }
 }
 
+// ── Focus button ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun FocusButton(
+    enabled: Boolean,
+    focusState: FocusState,
+    onClick: () -> Unit,
+) {
+    val color = if (focusState == FocusState.FOCUSED) PastelGreen else PastelRed
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.size(60.dp),
+        shape = CircleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = color,
+            contentColor = Color(0xFF111111),
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        contentPadding = PaddingValues(0.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+    ) {
+        when (focusState) {
+            FocusState.FOCUSING -> CircularProgressIndicator(
+                color = Color(0xFF111111),
+                modifier = Modifier.size(18.dp),
+                strokeWidth = 2.dp,
+            )
+            else -> Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF111111).copy(alpha = if (enabled) 0.2f else 0f)),
+            )
+        }
+    }
+}
+
 // ── Shutter button ────────────────────────────────────────────────────────────
 
 @Composable
@@ -773,48 +832,47 @@ private fun ShutterButton(
     capturing: Boolean,
     countdown: Int,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-        Button(
-            onClick = onClick,
-            enabled = enabled,
-            modifier = Modifier.size(80.dp),
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AccentYellow,
-                contentColor = Color(0xFF111111),
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            ),
-            contentPadding = PaddingValues(0.dp),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
-        ) {
-            when {
-                countdown > 0 -> {
-                    Text(
-                        text = "$countdown",
-                        color = Color(0xFF111111),
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Bold,
-                    )
-                }
-                capturing -> {
-                    CircularProgressIndicator(
-                        color = Color(0xFF111111),
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                    )
-                }
-                else -> {
-                    Box(
-                        modifier = Modifier
-                            .size(34.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (enabled) Color(0xFF111111).copy(alpha = 0.2f)
-                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                            ),
-                    )
-                }
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(80.dp),
+        shape = CircleShape,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = AccentYellow,
+            contentColor = Color(0xFF111111),
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ),
+        contentPadding = PaddingValues(0.dp),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
+    ) {
+        when {
+            countdown > 0 -> {
+                Text(
+                    text = "$countdown",
+                    color = Color(0xFF111111),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+            capturing -> {
+                CircularProgressIndicator(
+                    color = Color(0xFF111111),
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                )
+            }
+            else -> {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (enabled) Color(0xFF111111).copy(alpha = 0.2f)
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                        ),
+                )
             }
         }
     }
@@ -842,6 +900,7 @@ fun PreviewReady() {
                 releaseDelaySec = 2,
             ),
             onCaptureClicked = {},
+            onFocusClicked = {},
             onDelaySelected = {},
             onPropertySelected = { _, _ -> },
             onLiveViewToggle = {},
@@ -858,6 +917,7 @@ fun PreviewIdle() {
             uiState = CameraUiState(connectionState = ConnectionState.IDLE),
             liveViewBitmap = null,
             onCaptureClicked = {},
+            onFocusClicked = {},
             onDelaySelected = {},
             onPropertySelected = { _, _ -> },
             onLiveViewToggle = {},

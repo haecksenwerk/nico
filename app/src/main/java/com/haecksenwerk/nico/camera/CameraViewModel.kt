@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+enum class FocusState { IDLE, FOCUSING, FOCUSED, FAILED }
+
 /**
  * Picker state for a single editable camera property.
  * [propCode] is the PTP property code, kept opaque by the UI layer.
@@ -46,6 +48,7 @@ data class CameraUiState(
     val focusModeDisplay: String = "--",
     val releaseDelaySec: Int = 0,
     val captureCountdown: Int = 0,
+    val focusState: FocusState = FocusState.IDLE,
     val errorMessage: String? = null,
     val liveViewActive: Boolean = false,
     val modeEdit:     EditableProperty = EditableProperty(),
@@ -62,6 +65,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
 
     private val _releaseDelay = MutableStateFlow(0)
     private val _captureCountdown = MutableStateFlow(0)
+    private val _focusState = MutableStateFlow(FocusState.IDLE)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val liveViewBitmap: StateFlow<ImageBitmap?> = repository.liveViewFrame
@@ -76,7 +80,10 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         combine(repository.cameraName, _releaseDelay, _captureCountdown) { n, d, e -> Triple(n, d, e) },
         repository.propEnums,
         repository.liveViewActive,
-    ) { (state, props, error), (name, delay, countdown), propEnums, lvActive ->
+        _focusState,
+    ) { tripA, tripB, propEnums, lvActive, focusState ->
+        val (state, props, error) = tripA
+        val (name, delay, countdown) = tripB
         CameraUiState(
             connectionState = state,
             cameraName = name,
@@ -91,6 +98,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             focusModeDisplay = formatFocusModeNikon(props.focusModeNikon.toLong()),
             releaseDelaySec = delay,
             captureCountdown = countdown,
+            focusState = focusState,
             errorMessage = error,
             liveViewActive = lvActive,
             modeEdit     = EditableProperty(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE),  // read-only on Z series
@@ -122,6 +130,17 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
 
     fun onLiveViewToggle() {
         viewModelScope.launch { repository.toggleLiveView() }
+    }
+
+    fun onFocusClicked() {
+        if (uiState.value.connectionState != ConnectionState.READY) return
+        viewModelScope.launch {
+            _focusState.value = FocusState.FOCUSING
+            val found = repository.triggerAutofocus()
+            _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
+            delay(2_000L)
+            _focusState.value = FocusState.IDLE
+        }
     }
 
     fun onPropertySelected(propCode: Int, index: Int) {

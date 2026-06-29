@@ -192,6 +192,28 @@ class CameraRepository(private val usbManager: UsbManager) {
 
     // ── Camera operations ─────────────────────────────────────────────────────
 
+    /** Sends AfDrive and polls DeviceReady up to 5 s. Returns true if focus found. */
+    suspend fun triggerAutofocus(): Boolean {
+        val s = session ?: return false
+        try {
+            val resp = ptpMutex.withLock { s.afDrive() }
+            s.requireOk(resp, "AfDrive")
+        } catch (_: Exception) {
+            return false
+        }
+        repeat(50) {
+            delay(100.milliseconds)
+            val code = try { ptpMutex.withLock { s.deviceReadyCode() } } catch (_: Exception) { return false }
+            when (code) {
+                PtpConstants.RC_OK             -> return true
+                PtpConstants.RC_NIKON_OUT_OF_FOCUS -> return false
+                PtpConstants.RC_DEVICE_BUSY    -> { /* still searching */ }
+                else                           -> return false
+            }
+        }
+        return false
+    }
+
     suspend fun capture() {
         val s = session ?: return
         _state.value = ConnectionState.CAPTURING

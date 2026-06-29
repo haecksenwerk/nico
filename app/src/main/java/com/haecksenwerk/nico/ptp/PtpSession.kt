@@ -483,6 +483,14 @@ class PtpSession(private val transport: PtpTransport) {
         return data.copyOfRange(soi, if (eoi != null) eoi + 2 else data.size)
     }
 
+    /** Trigger Nikon autofocus (PTP_OC_NIKON_AfDrive). */
+    suspend fun afDrive(): PtpResponse =
+        sendCommand(PtpConstants.OP_NIKON_AF_DRIVE)
+
+    /** Raw response code from NikonDeviceReady — callers use this to detect AF results. */
+    suspend fun deviceReadyCode(): Int =
+        sendCommand(PtpConstants.OP_NIKON_DEVICE_READY).code
+
     /** InitiateCapture: storage=0 (current), format=0 (default). */
     suspend fun initiateCapture(): PtpResponse =
         sendCommand(PtpConstants.OP_INITIATE_CAPTURE, listOf(0L, 0L))
