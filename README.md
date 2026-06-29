@@ -72,9 +72,11 @@ Grab the latest signed APK directly from the [Releases](https://github.com/haeck
 2. **Live view** starts on the main screen. Tap the camera icon to toggle it on or off.
 3. **Change settings** by tapping any property tile (aperture, white balance, metering, focus mode) and selecting a value from the picker.
    - Mode, Shutter speed, EV compensation, and ISO are **display-only** - they reflect the current camera state but cannot be changed from the app.
-4. **Capture** a photo with the shutter button. Use the timer selector to add a delay before release.
-5. **Browse** pictures on the camera card in the browser tab. Tap a picture to preview it.
-6. **Download** pictures from the browser - saved to the **Pictures** folder on your phone and visible in the **nico** album in Google Photos.
+4. **Select AF area** by tapping anywhere on the live view image. A yellow bracket appears briefly at the tapped spot to confirm the new focus point.
+5. **Focus** by pressing the circular focus button to the left of the shutter button. The button turns green when the camera has acquired focus and red when it has not.
+6. **Capture** a photo with the shutter button. Use the timer selector to add a delay before release.
+7. **Browse** pictures on the camera card in the browser tab. Tap a picture to preview it.
+8. **Download** pictures from the browser - saved to the **Pictures** folder on your phone and visible in the **nico** album in Google Photos.
 
 ---
 
