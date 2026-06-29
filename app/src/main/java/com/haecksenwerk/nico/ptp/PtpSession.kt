@@ -1,5 +1,7 @@
 package com.haecksenwerk.nico.ptp
 
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.nio.ByteBuffer
@@ -22,7 +24,7 @@ data class PtpDataResponse(
     override fun hashCode() = 31 * payload.contentHashCode() + response.hashCode()
 }
 
-class PtpException(message: String, val code: Int = 0) : Exception(message)
+class PtpException(message: String) : Exception(message)
 
 // ── Session ───────────────────────────────────────────────────────────────────
 
@@ -184,7 +186,7 @@ class PtpSession(private val transport: PtpTransport) {
         if (containerType(first) != PtpConstants.CONTAINER_TYPE_DATA) {
             val resp = parseResponse(first)
             if (resp.code != PtpConstants.RC_OK)
-                throw PtpException("GetObject: 0x${resp.code.toString(16)}", resp.code)
+                throw PtpException("GetObject: 0x${resp.code.toString(16)}")
             return 0L
         }
 
@@ -195,13 +197,17 @@ class PtpSession(private val transport: PtpTransport) {
         var written = 0L
         val toWriteFirst = minOf((first.size - headerEnd).toLong(), totalDataLen).toInt()
         if (toWriteFirst > 0) {
-            out.write(first, headerEnd, toWriteFirst)
+            withContext(Dispatchers.IO) {
+                out.write(first, headerEnd, toWriteFirst)
+            }
             written += toWriteFirst
         }
         while (written < totalDataLen) {
             val chunk = transport.bulkIn() ?: break
             val toWrite = minOf(chunk.size.toLong(), totalDataLen - written).toInt()
-            out.write(chunk, 0, toWrite)
+            withContext(Dispatchers.IO) {
+                out.write(chunk, 0, toWrite)
+            }
             written += toWrite
         }
 
@@ -209,7 +215,7 @@ class PtpSession(private val transport: PtpTransport) {
             ?: throw PtpException("No response after stream (op=0x${opCode.toString(16)})")
         val resp = parseResponse(respRaw)
         if (resp.code != PtpConstants.RC_OK)
-            throw PtpException("GetObject: 0x${resp.code.toString(16)}", resp.code)
+            throw PtpException("GetObject: 0x${resp.code.toString(16)}")
         return written
     }
 
@@ -242,7 +248,7 @@ class PtpSession(private val transport: PtpTransport) {
 
     fun requireOk(resp: PtpResponse, opName: String) {
         if (resp.code != PtpConstants.RC_OK)
-            throw PtpException("$opName → 0x${resp.code.toString(16)}", resp.code)
+            throw PtpException("$opName → 0x${resp.code.toString(16)}")
     }
 
     // ── Standard operations ───────────────────────────────────────────────────
@@ -467,8 +473,8 @@ class PtpSession(private val transport: PtpTransport) {
         val dr = sendCommandReadData(PtpConstants.OP_NIKON_GET_LIVEVIEW_IMG)
         return when (dr.response.code) {
             PtpConstants.RC_OK -> extractJpeg(dr.payload)
-            PtpConstants.RC_NIKON_NOT_LIVEVIEW -> throw PtpException("NotLiveView", PtpConstants.RC_NIKON_NOT_LIVEVIEW)
-            PtpConstants.RC_DEVICE_BUSY -> throw PtpException("DeviceBusy", PtpConstants.RC_DEVICE_BUSY)
+            PtpConstants.RC_NIKON_NOT_LIVEVIEW -> throw PtpException("NotLiveView")
+            PtpConstants.RC_DEVICE_BUSY -> throw PtpException("DeviceBusy")
             else -> null
         }
     }
@@ -509,9 +515,6 @@ class PtpSession(private val transport: PtpTransport) {
 
     fun decodeUint32(data: ByteArray): Long =
         ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).int.toLong() and 0xFFFFFFFFL
-
-    fun decodeInt32(data: ByteArray): Int =
-        ByteBuffer.wrap(data).order(ByteOrder.LITTLE_ENDIAN).int
 
     // ── Object browser operations ─────────────────────────────────────────────
 
@@ -560,13 +563,6 @@ class PtpSession(private val transport: PtpTransport) {
                 out += info
             }
         }
-    }
-
-    /** GetObjectInfo for a single handle — used by the thumbnail fetcher and detail view. */
-    suspend fun getObjectInfo(handle: Long): PtpObjectInfo {
-        val dr = sendCommandReadData(PtpConstants.OP_GET_OBJECT_INFO, listOf(handle))
-        requireOk(dr.response, "GetObjectInfo($handle)")
-        return parseObjectInfo(handle, dr.payload)
     }
 
     private fun parseObjectInfo(handle: Long, payload: ByteArray): PtpObjectInfo {
@@ -627,10 +623,6 @@ class PtpSession(private val transport: PtpTransport) {
     /** GetObject: streams the full object to [out]. Returns bytes written. */
     suspend fun downloadObject(handle: Long, out: OutputStream): Long =
         sendCommandStreamData(PtpConstants.OP_GET_OBJECT, listOf(handle), out)
-
-    /** DeleteObject: removes [handle] from camera storage. format=0 means any format. */
-    suspend fun deleteObject(handle: Long): PtpResponse =
-        sendCommand(PtpConstants.OP_DELETE_OBJECT, listOf(handle, 0L))
 
     /** Decode a signed integer from 2 or 4 bytes (handles both INT16 and INT32 payloads). */
     fun decodeIntFlex(data: ByteArray): Int = when (data.size) {

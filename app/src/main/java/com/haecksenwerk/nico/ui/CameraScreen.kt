@@ -120,7 +120,6 @@ fun CameraScreen(
                 uiState = uiState,
                 liveViewBitmap = liveViewBitmap,
                 onPropertySelected = onPropertySelected,
-                onDelaySelected = onDelaySelected,
                 onLiveViewToggle = onLiveViewToggle,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -333,7 +332,6 @@ private fun SettingsPanel(
     uiState: CameraUiState,
     liveViewBitmap: ImageBitmap?,
     onPropertySelected: (Int, Int) -> Unit,
-    onDelaySelected: (Int) -> Unit,
     onLiveViewToggle: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -382,33 +380,6 @@ private fun TileRow(content: @Composable () -> Unit) {
 @Composable
 private fun TileGap() {
     Spacer(Modifier.width(8.dp))
-}
-
-@Composable
-private fun SettingTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .padding(horizontal = 6.dp, vertical = 12.dp),
-    ) {
-        Text(
-            text = label,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.2.sp,
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = value,
-            color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Light,
-            textAlign = TextAlign.Center,
-        )
-    }
 }
 
 // ── Generic editable tile ─────────────────────────────────────────────────────

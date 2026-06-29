@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 enum class FocusState { IDLE, FOCUSING, FOCUSED, FAILED }
 
@@ -138,7 +139,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
             _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
-            delay(2_000L)
+            delay(2.seconds)
             _focusState.value = FocusState.IDLE
         }
     }
@@ -155,7 +156,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
                 _captureCountdown.value = delaySec
                 var remaining = delaySec
                 while (remaining > 0) {
-                    delay(1_000L)
+                    delay(1.seconds)
                     remaining--
                     _captureCountdown.value = remaining
                 }

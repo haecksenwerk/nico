@@ -5,8 +5,6 @@ object PtpConstants {
     // Container types (little-endian uint16 at offset 4)
     const val CONTAINER_TYPE_COMMAND = 0x0001
     const val CONTAINER_TYPE_DATA = 0x0002
-    const val CONTAINER_TYPE_RESPONSE = 0x0003
-    const val CONTAINER_TYPE_EVENT = 0x0004
 
     // Standard PTP operation codes
     const val OP_GET_DEVICE_INFO = 0x1001

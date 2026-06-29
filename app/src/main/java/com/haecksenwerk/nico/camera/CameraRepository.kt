@@ -247,9 +247,11 @@ class CameraRepository(private val usbManager: UsbManager) {
             return
         }
         // Poll until camera is ready (up to 2 s)
-        for (attempt in 0 until 20) {
+        var attempts = 0
+        while (attempts < 20) {
             delay(100.milliseconds)
             if (try { ptpMutex.withLock { s.deviceReady() } } catch (_: Exception) { false }) break
+            attempts++
         }
         liveViewShouldRun = true
         liveViewJob?.cancel()
