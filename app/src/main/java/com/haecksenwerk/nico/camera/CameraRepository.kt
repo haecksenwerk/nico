@@ -74,6 +74,11 @@ class CameraRepository(private val usbManager: UsbManager) {
     private val _liveViewFrame = MutableStateFlow<ByteArray?>(null)
     val liveViewFrame: StateFlow<ByteArray?> = _liveViewFrame.asStateFlow()
 
+    // ChangeAfArea x-coordinate range = LiveViewZoomArea max × 2.
+    // Populated at connect time; 0 until the property has been read.
+    private val _afAreaXMax = MutableStateFlow(0)
+    val afAreaXMax: StateFlow<Int> = _afAreaXMax.asStateFlow()
+
     private var transport: PtpTransport? = null
     private var session: PtpSession? = null
     private var activationJob: Job? = null
@@ -182,6 +187,7 @@ class CameraRepository(private val usbManager: UsbManager) {
         _cameraName.value = ""
         _properties.value = CameraProperties()
         _propEnums.value = emptyMap()
+        _afAreaXMax.value = 0
         _error.value = null
         thumbCache.evictAll()
     }
@@ -191,6 +197,17 @@ class CameraRepository(private val usbManager: UsbManager) {
     }
 
     // ── Camera operations ─────────────────────────────────────────────────────
+
+    /** Moves the AF point to pixel (x, y) in the LiveView frame. Returns false if not in LiveView. */
+    suspend fun setAfArea(x: Int, y: Int): Boolean {
+        val s = session ?: return false
+        return try {
+            val resp = ptpMutex.withLock { s.changeAfArea(x, y) }
+            resp.code == PtpConstants.RC_OK
+        } catch (_: Exception) {
+            false
+        }
+    }
 
     /** Sends AfDrive and polls DeviceReady up to 5 s. Returns true if focus found. */
     suspend fun triggerAutofocus(): Boolean {
@@ -311,6 +328,14 @@ class CameraRepository(private val usbManager: UsbManager) {
             if (values.isNotEmpty()) result[propCode] = PropDescResult(dataType, values)
         }
         _propEnums.value = result
+
+        // Derive ChangeAfArea coordinate range from LiveViewZoomArea max value.
+        // ZoomArea max = half the x-coordinate range (furthest center a zoom window can sit).
+        val (_, zoomAreaValues) = try {
+            ptpMutex.withLock { s.getDevicePropDescEnum(PtpConstants.PROP_NIKON_LIVE_VIEW_ZOOM_AREA) }
+        } catch (_: Exception) { 0 to emptyList() }
+        val zoomAreaMax = zoomAreaValues.maxOrNull()?.toInt() ?: 0
+        if (zoomAreaMax > 0) _afAreaXMax.value = zoomAreaMax * 4
     }
 
     suspend fun setDeviceProp(propCode: Int, value: Long) {

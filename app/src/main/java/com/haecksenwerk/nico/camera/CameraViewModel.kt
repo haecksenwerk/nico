@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
 enum class FocusState { IDLE, FOCUSING, FOCUSED, FAILED }
@@ -136,6 +137,29 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     fun onFocusClicked() {
         if (uiState.value.connectionState != ConnectionState.READY) return
         viewModelScope.launch {
+            _focusState.value = FocusState.FOCUSING
+            val found = repository.triggerAutofocus()
+            _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
+            delay(2.seconds)
+            _focusState.value = FocusState.IDLE
+        }
+    }
+
+    fun onAfAreaSelected(normX: Float, normY: Float) {
+        if (uiState.value.connectionState != ConnectionState.READY) return
+        if (!uiState.value.liveViewActive) return
+        // x-range = LiveViewZoomArea max × 2 (body-specific; see PROP_NIKON_LIVE_VIEW_ZOOM_AREA).
+        // y-range = x-range × (LiveView JPEG height / width) to match sensor aspect ratio.
+        val xMax = repository.afAreaXMax.value.takeIf { it > 0 } ?: return
+        val bm = liveViewBitmap.value
+        val yMax = if (bm != null && bm.width > 0)
+            (xMax.toLong() * bm.height / bm.width).toInt()
+        else
+            xMax * 2 / 3   // fallback: assume 3:2 sensor
+        val camX = (normX * xMax).roundToInt()
+        val camY = (normY * yMax).roundToInt()
+        viewModelScope.launch {
+            repository.setAfArea(camX, camY)
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
             _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED

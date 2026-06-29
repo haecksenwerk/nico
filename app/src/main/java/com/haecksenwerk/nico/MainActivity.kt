@@ -112,6 +112,7 @@ class MainActivity : ComponentActivity() {
                     onDelaySelected = viewModel::onDelaySelected,
                     onPropertySelected = viewModel::onPropertySelected,
                     onLiveViewToggle = viewModel::onLiveViewToggle,
+                    onAfAreaSelected = viewModel::onAfAreaSelected,
                     settingsViewModel = settingsViewModel,
                     browserViewModel = browserViewModel,
                     modifier = Modifier.fillMaxSize(),

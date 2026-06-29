@@ -30,7 +30,8 @@ object PtpConstants {
     // Nikon vendor extension codes
     const val OP_NIKON_GET_EVENT = 0x90C7   // data-in: packed event list
     const val OP_NIKON_DEVICE_READY = 0x90C8
-    const val OP_NIKON_AF_DRIVE = 0x90C1  // PTP_OC_NIKON_AfDrive — no params, no data
+    const val OP_NIKON_AF_DRIVE = 0x90C1        // PTP_OC_NIKON_AfDrive — no params, no data
+    const val OP_NIKON_CHANGE_AF_AREA = 0x9205  // 2 params: x, y in LiveView pixel coords; LiveView must be active
     const val OP_NIKON_START_LIVEVIEW = 0x9201
     const val OP_NIKON_END_LIVEVIEW = 0x9202
     const val OP_NIKON_GET_LIVEVIEW_IMG = 0x9203
@@ -54,6 +55,10 @@ object PtpConstants {
 
     // Nikon Z-series vendor property codes (write-enabled where standard codes are read-only)
     const val PROP_NIKON_FOCUS_MODE = 0xD061      // UINT8 enum: 0=AF-S, 1=AF-C, 4=MF
+    // UINT32 enum; max value × 4 = ChangeAfArea x-coordinate range
+    // APS-C bodies (Z fc, Z30, Z50): [0,360,720,1440] → x_max=5760
+    // Full-frame bodies (Z6, Z6II):  [0,512,1024,2048] → x_max=8192
+    const val PROP_NIKON_LIVE_VIEW_ZOOM_AREA = 0xD1BD
     const val PROP_NIKON_ISO_EX = 0xD0B4          // UINT32: ISO value (read from camera events)
     const val PROP_NIKON_EXPOSURE_TIME = 0xD100   // UINT32: shutter speed, encoding (num<<16)|den; 0xFFFFFFFF=Bulb
 

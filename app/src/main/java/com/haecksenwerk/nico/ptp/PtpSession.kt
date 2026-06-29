@@ -493,6 +493,10 @@ class PtpSession(private val transport: PtpTransport) {
     suspend fun afDrive(): PtpResponse =
         sendCommand(PtpConstants.OP_NIKON_AF_DRIVE)
 
+    /** Move the AF point to pixel (x, y) in the LiveView image (0x9205). LiveView must be active. */
+    suspend fun changeAfArea(x: Int, y: Int): PtpResponse =
+        sendCommand(PtpConstants.OP_NIKON_CHANGE_AF_AREA, listOf(x.toLong(), y.toLong()))
+
     /** Raw response code from NikonDeviceReady — callers use this to detect AF results. */
     suspend fun deviceReadyCode(): Int =
         sendCommand(PtpConstants.OP_NIKON_DEVICE_READY).code

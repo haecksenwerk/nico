@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -36,11 +37,13 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -98,6 +101,7 @@ fun CameraScreen(
     onDelaySelected: (Int) -> Unit,
     onPropertySelected: (propCode: Int, index: Int) -> Unit,
     onLiveViewToggle: () -> Unit,
+    onAfAreaSelected: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val isReady = uiState.connectionState == ConnectionState.READY ||
@@ -121,6 +125,7 @@ fun CameraScreen(
                 liveViewBitmap = liveViewBitmap,
                 onPropertySelected = onPropertySelected,
                 onLiveViewToggle = onLiveViewToggle,
+                onAfAreaSelected = onAfAreaSelected,
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.weight(1f))
@@ -333,6 +338,7 @@ private fun SettingsPanel(
     liveViewBitmap: ImageBitmap?,
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
+    onAfAreaSelected: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier) {
@@ -341,6 +347,7 @@ private fun SettingsPanel(
             bitmap = liveViewBitmap,
             cameraName = uiState.cameraName,
             onToggle = onLiveViewToggle,
+            onAfAreaSelected = onAfAreaSelected,
             modifier = Modifier.fillMaxWidth(),
         )
 
@@ -592,8 +599,16 @@ private fun LiveViewArea(
     bitmap: ImageBitmap?,
     cameraName: String,
     onToggle: () -> Unit,
+    onAfAreaSelected: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var tapNorm by remember { mutableStateOf<Offset?>(null) }
+    LaunchedEffect(tapNorm) {
+        if (tapNorm != null) {
+            delay(2_000)
+            tapNorm = null
+        }
+    }
     Column(modifier = modifier) {
         // Header: LIVE VIEW label left · camera name centred · visibility button right
         Box(
@@ -655,7 +670,16 @@ private fun LiveViewArea(
                     bitmap = bitmap,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(onAfAreaSelected) {
+                            detectTapGestures { offset ->
+                                val normX = offset.x / size.width
+                                val normY = offset.y / size.height
+                                tapNorm = Offset(normX, normY)
+                                onAfAreaSelected(normX, normY)
+                            }
+                        },
                 )
                 isActive -> CircularProgressIndicator(
                     color = AccentYellow,
@@ -668,6 +692,23 @@ private fun LiveViewArea(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
                     modifier = Modifier.size(52.dp),
                 )
+            }
+            tapNorm?.let { norm ->
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val cx = norm.x * size.width
+                    val cy = norm.y * size.height
+                    val half = size.minDimension * 0.08f
+                    val arm = half * 0.45f
+                    val sw = 2.dp.toPx()
+                    listOf(-1f, 1f).forEach { sx ->
+                        listOf(-1f, 1f).forEach { sy ->
+                            val bx = cx + sx * half
+                            val by = cy + sy * half
+                            drawLine(AccentYellow, Offset(bx - sx * arm, by), Offset(bx, by), strokeWidth = sw)
+                            drawLine(AccentYellow, Offset(bx, by - sy * arm), Offset(bx, by), strokeWidth = sw)
+                        }
+                    }
+                }
             }
         }
     }
@@ -875,6 +916,7 @@ fun PreviewReady() {
             onDelaySelected = {},
             onPropertySelected = { _, _ -> },
             onLiveViewToggle = {},
+            onAfAreaSelected = { _, _ -> },
             liveViewBitmap = null,
         )
     }
@@ -892,6 +934,7 @@ fun PreviewIdle() {
             onDelaySelected = {},
             onPropertySelected = { _, _ -> },
             onLiveViewToggle = {},
+            onAfAreaSelected = { _, _ -> },
         )
     }
 }

@@ -37,6 +37,7 @@ fun AppNavHost(
     onDelaySelected: (Int) -> Unit,
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
+    onAfAreaSelected: (Float, Float) -> Unit,
     settingsViewModel: SettingsViewModel,
     browserViewModel: BrowserViewModel,
     modifier: Modifier = Modifier,
@@ -92,6 +93,7 @@ fun AppNavHost(
                         onDelaySelected = onDelaySelected,
                         onPropertySelected = onPropertySelected,
                         onLiveViewToggle = onLiveViewToggle,
+                        onAfAreaSelected = onAfAreaSelected,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
