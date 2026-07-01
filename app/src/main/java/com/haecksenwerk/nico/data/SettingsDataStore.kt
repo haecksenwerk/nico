@@ -20,6 +20,7 @@ private object Keys {
     val TRUE_BLACK = booleanPreferencesKey("true_black")
     val LANGUAGE = stringPreferencesKey("language")
     val SHOW_FORMAT_BADGES = booleanPreferencesKey("show_format_badges")
+    val THUMBNAILS_PER_ROW = intPreferencesKey("thumbnails_per_row")
 }
 
 class SettingsDataStore(private val context: Context) {
@@ -35,6 +36,7 @@ class SettingsDataStore(private val context: Context) {
             trueBlack = prefs[Keys.TRUE_BLACK] ?: false,
             language = prefs[Keys.LANGUAGE] ?: "system",
             showFormatBadges = prefs[Keys.SHOW_FORMAT_BADGES] ?: true,
+            thumbnailsPerRow = (prefs[Keys.THUMBNAILS_PER_ROW] ?: 3).coerceIn(2, 4),
         )
     }
 
@@ -58,4 +60,7 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setShowFormatBadges(enabled: Boolean) =
         context.dataStore.edit { it[Keys.SHOW_FORMAT_BADGES] = enabled }
+
+    suspend fun setThumbnailsPerRow(count: Int) =
+        context.dataStore.edit { it[Keys.THUMBNAILS_PER_ROW] = count.coerceIn(2, 4) }
 }

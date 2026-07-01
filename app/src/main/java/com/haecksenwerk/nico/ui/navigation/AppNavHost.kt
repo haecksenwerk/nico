@@ -103,6 +103,7 @@ fun AppNavHost(
                         viewModel = browserViewModel,
                         onOpenDetail = { handle -> navController.navigate(Screen.Detail(handle)) },
                         showFormatBadges = settings.showFormatBadges,
+                        thumbnailsPerRow = settings.thumbnailsPerRow,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

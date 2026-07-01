@@ -24,6 +24,7 @@ class SettingsViewModel(private val store: SettingsDataStore) : ViewModel() {
     fun setTrueBlack(enabled: Boolean) = viewModelScope.launch { store.setTrueBlack(enabled) }
     fun setLiveViewOnConnect(enabled: Boolean) = viewModelScope.launch { store.setLiveViewOnConnect(enabled) }
     fun setShowFormatBadges(enabled: Boolean) = viewModelScope.launch { store.setShowFormatBadges(enabled) }
+    fun setThumbnailsPerRow(count: Int) = viewModelScope.launch { store.setThumbnailsPerRow(count) }
 
     companion object {
         fun Factory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {

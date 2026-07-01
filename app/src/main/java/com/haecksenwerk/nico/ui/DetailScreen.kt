@@ -138,23 +138,15 @@ fun DetailScreen(
             )
         },
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .background(Color.Black),
         ) {
-            if (info != null) {
-                ExifHeader(
-                    captureDate = info.captureDate,
-                    exifData = result?.exifData,
-                )
-            }
-
+            // Image centered over the full content area
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 val previewBytes = result?.imageBytes
@@ -186,6 +178,15 @@ fun DetailScreen(
                     else -> Text("Preview not available", color = Color.White)
                 }
             }
+
+            // EXIF info overlaid at the top so the image can be centered on the full area
+            if (info != null) {
+                ExifHeader(
+                    captureDate = info.captureDate,
+                    exifData = result?.exifData,
+                    modifier = Modifier.align(Alignment.TopStart),
+                )
+            }
         }
     }
 }
@@ -194,9 +195,10 @@ fun DetailScreen(
 private fun ExifHeader(
     captureDate: String,
     exifData: ExifData?,
+    modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .background(Color.Black)
             .padding(horizontal = 16.dp, vertical = 10.dp),

@@ -11,4 +11,5 @@ data class NicoSettings(
     val trueBlack: Boolean = false,
     val language: String = "system",
     val showFormatBadges: Boolean = true,
+    val thumbnailsPerRow: Int = 3,
 )

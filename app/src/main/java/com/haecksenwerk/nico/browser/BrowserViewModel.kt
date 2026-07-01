@@ -122,6 +122,16 @@ class BrowserViewModel(
         }
     }
 
+    fun toggleSelectAll(items: List<PtpObjectInfo>) {
+        val selectable = items
+            .filter { it.filename !in _downloadedFilenames.value }
+            .map { it.handle }
+        _selectedHandles.update { current ->
+            if (current.size == selectable.size && selectable.isNotEmpty()) emptySet()
+            else selectable.toSet()
+        }
+    }
+
     /**
      * Loads a preview and EXIF metadata for the detail view.
      * The same 4 MB fetch covers both: EXIF IFDs are always at the start of JPEG/NEF,

@@ -26,8 +26,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -63,12 +65,14 @@ fun BrowserScreen(
     viewModel: BrowserViewModel,
     onOpenDetail: (Long) -> Unit,
     showFormatBadges: Boolean = true,
+    thumbnailsPerRow: Int = 3,
     modifier: Modifier = Modifier,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selected by viewModel.selectedHandles.collectAsState()
     val downloadProgress by viewModel.downloadProgress.collectAsState()
     val downloadedFilenames by viewModel.downloadedFilenames.collectAsState()
+    val readyItems = (uiState as? BrowserUiState.Ready)?.items ?: emptyList()
 
     Scaffold(
         modifier = modifier,
@@ -81,6 +85,16 @@ fun BrowserScreen(
                 },
                 windowInsets = WindowInsets(0),
                 actions = {
+                    if (uiState is BrowserUiState.Ready && readyItems.isNotEmpty()) {
+                        val selectableCount = readyItems.count { it.filename !in downloadedFilenames }
+                        val allSelected = selectableCount > 0 && selected.size == selectableCount
+                        IconButton(onClick = { viewModel.toggleSelectAll(readyItems) }) {
+                            Icon(
+                                imageVector = if (allSelected) Icons.Default.Deselect else Icons.Default.SelectAll,
+                                contentDescription = if (allSelected) "Deselect all" else "Select all",
+                            )
+                        }
+                    }
                     if (uiState is BrowserUiState.Ready || uiState is BrowserUiState.Empty) {
                         IconButton(onClick = viewModel::refresh) {
                             Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -90,10 +104,9 @@ fun BrowserScreen(
             )
         },
         floatingActionButton = {
-            val items = (uiState as? BrowserUiState.Ready)?.items ?: emptyList()
             if (selected.isNotEmpty() && downloadProgress == null) {
                 ExtendedFloatingActionButton(
-                    onClick = { viewModel.downloadSelected(items) },
+                    onClick = { viewModel.downloadSelected(readyItems) },
                     icon = { Icon(Icons.Default.Download, contentDescription = null) },
                     text = { Text("Save ${selected.size}") },
                 )
@@ -103,7 +116,8 @@ fun BrowserScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .background(MaterialTheme.colorScheme.surface),
         ) {
             when (val state = uiState) {
                 is BrowserUiState.NoCamera -> EmptyPlaceholder(
@@ -130,6 +144,7 @@ fun BrowserScreen(
                     selectedHandles = selected,
                     imageLoader = viewModel.imageLoader,
                     showFormatBadges = showFormatBadges,
+                    thumbnailsPerRow = thumbnailsPerRow,
                     downloadedFilenames = downloadedFilenames,
                     onTap = { handle ->
                         if (selected.isNotEmpty()) viewModel.toggleSelection(handle)
@@ -193,12 +208,13 @@ private fun PhotoGrid(
     selectedHandles: Set<Long>,
     imageLoader: coil3.ImageLoader,
     showFormatBadges: Boolean,
+    thumbnailsPerRow: Int,
     downloadedFilenames: Set<String>,
     onTap: (Long) -> Unit,
     onLongPress: (Long) -> Unit,
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(3),
+        columns = GridCells.Fixed(thumbnailsPerRow),
         contentPadding = PaddingValues(2.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -210,6 +226,7 @@ private fun PhotoGrid(
                 modifier = Modifier
                     .aspectRatio(1f)
                     .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.surface)
                     .combinedClickable(
                         onClick = {
                             val downloaded = info.filename in downloadedFilenames

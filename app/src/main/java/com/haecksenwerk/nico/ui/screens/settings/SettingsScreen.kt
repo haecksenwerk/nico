@@ -103,6 +103,13 @@ fun SettingsScreen(
                             )
                         },
                     )
+                    SegmentedButtonRow(
+                        title = "Thumbnails per row",
+                        options = listOf(2, 3, 4),
+                        selected = settings.thumbnailsPerRow,
+                        onSelect = { viewModel.setThumbnailsPerRow(it) },
+                        labelOf = { it.toString() },
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
