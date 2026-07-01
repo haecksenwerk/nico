@@ -9,6 +9,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.haecksenwerk.nico.ptp.PtpConstants
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -68,6 +70,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     private val _releaseDelay = MutableStateFlow(0)
     private val _captureCountdown = MutableStateFlow(0)
     private val _focusState = MutableStateFlow(FocusState.IDLE)
+    private var afJob: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val liveViewBitmap: StateFlow<ImageBitmap?> = repository.liveViewFrame
@@ -136,7 +139,9 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
 
     fun onFocusClicked() {
         if (uiState.value.connectionState != ConnectionState.READY) return
-        viewModelScope.launch {
+        val prev = afJob
+        afJob = viewModelScope.launch {
+            prev?.cancelAndJoin()   // wait for AfDriveCancel to complete before starting new AF
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
             _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
@@ -158,7 +163,9 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             xMax * 2 / 3   // fallback: assume 3:2 sensor
         val camX = (normX * xMax).roundToInt()
         val camY = (normY * yMax).roundToInt()
-        viewModelScope.launch {
+        val prev = afJob
+        afJob = viewModelScope.launch {
+            prev?.cancelAndJoin()   // wait for AfDriveCancel to complete before ChangeAfArea + AfDrive
             repository.setAfArea(camX, camY)
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()

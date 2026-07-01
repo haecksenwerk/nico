@@ -458,9 +458,15 @@ class PtpSession(private val transport: PtpTransport) {
         try { sendCommand(PtpConstants.OP_NIKON_END_LIVEVIEW) } catch (_: Exception) {}
     }
 
-    /** Returns true when the camera is ready for the next operation. */
-    suspend fun deviceReady(): Boolean =
-        sendCommand(PtpConstants.OP_NIKON_DEVICE_READY).code == PtpConstants.RC_OK
+    /**
+     * Returns true when the camera is ready for the next operation.
+     * RC_NIKON_SILENT_RELEASE_BUSY (0xA201) means the camera is in silent-shutter mode
+     * but is fully responsive — libgphoto2 nikon_wait_busy() treats it as RC_OK.
+     */
+    suspend fun deviceReady(): Boolean {
+        val code = sendCommand(PtpConstants.OP_NIKON_DEVICE_READY).code
+        return code == PtpConstants.RC_OK || code == PtpConstants.RC_NIKON_SILENT_RELEASE_BUSY
+    }
 
     /**
      * Fetch one live view JPEG frame.  The raw payload has an opaque header before
@@ -492,6 +498,11 @@ class PtpSession(private val transport: PtpTransport) {
     /** Trigger Nikon autofocus (PTP_OC_NIKON_AfDrive). */
     suspend fun afDrive(): PtpResponse =
         sendCommand(PtpConstants.OP_NIKON_AF_DRIVE)
+
+    /** Cancel an in-progress AF drive (PTP_OC_NIKON_AfDriveCancel, 0x9206). Errors are ignored. */
+    suspend fun afDriveCancel() {
+        try { sendCommand(PtpConstants.OP_NIKON_AF_DRIVE_CANCEL) } catch (_: Exception) {}
+    }
 
     /** Move the AF point to pixel (x, y) in the LiveView image (0x9205). LiveView must be active. */
     suspend fun changeAfArea(x: Int, y: Int): PtpResponse =

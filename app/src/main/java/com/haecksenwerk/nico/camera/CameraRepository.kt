@@ -3,6 +3,7 @@ package com.haecksenwerk.nico.camera
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import com.haecksenwerk.nico.ptp.PtpConstants
+import com.haecksenwerk.nico.ptp.PtpException
 import com.haecksenwerk.nico.ptp.PtpObjectInfo
 import com.haecksenwerk.nico.ptp.PtpSession
 import com.haecksenwerk.nico.ptp.PtpTransport
@@ -19,6 +20,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -209,26 +212,48 @@ class CameraRepository(private val usbManager: UsbManager) {
         }
     }
 
-    /** Sends AfDrive and polls DeviceReady up to 5 s. Returns true if focus found. */
+    /**
+     * Sends AfDrive and polls DeviceReady up to 5 s. Returns true if focus found.
+     *
+     * When cancelled (e.g. because the user tapped a new AF area), sends
+     * AfDriveCancel (0x9206) so the camera stops hunting before the next
+     * ChangeAfArea + AfDrive arrives.
+     */
     suspend fun triggerAutofocus(): Boolean {
         val s = session ?: return false
         try {
             val resp = ptpMutex.withLock { s.afDrive() }
             s.requireOk(resp, "AfDrive")
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
             return false
         }
-        repeat(50) {
-            delay(100.milliseconds)
-            val code = try { ptpMutex.withLock { s.deviceReadyCode() } } catch (_: Exception) { return false }
-            when (code) {
-                PtpConstants.RC_OK             -> return true
-                PtpConstants.RC_NIKON_OUT_OF_FOCUS -> return false
-                PtpConstants.RC_DEVICE_BUSY    -> { /* still searching */ }
-                else                           -> return false
+        try {
+            repeat(50) {
+                delay(100.milliseconds)
+                val code = try {
+                    ptpMutex.withLock { s.deviceReadyCode() }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    return false
+                }
+                when (code) {
+                    PtpConstants.RC_OK,
+                    PtpConstants.RC_NIKON_SILENT_RELEASE_BUSY -> return true   // camera is ready (silent-shutter mode)
+                    PtpConstants.RC_NIKON_OUT_OF_FOCUS        -> return false
+                    PtpConstants.RC_DEVICE_BUSY,
+                    PtpConstants.RC_NIKON_BULB_RELEASE_BUSY   -> { /* still searching — keep polling */ }
+                    else                                      -> return false
+                }
             }
+            return false
+        } catch (e: CancellationException) {
+            // Tell the camera to stop searching before the next AF drive arrives.
+            withContext(NonCancellable) {
+                try { ptpMutex.withLock { s.afDriveCancel() } } catch (_: Exception) {}
+            }
+            throw e
         }
-        return false
     }
 
     suspend fun capture() {
@@ -468,7 +493,12 @@ class CameraRepository(private val usbManager: UsbManager) {
     // Throws on PTP error so BrowserViewModel can surface the failure in the UI.
     suspend fun listImages(): List<PtpObjectInfo> {
         val s = session ?: return emptyList()
-        return ptpMutex.withLock { s.listImages() }
+        return try {
+            ptpMutex.withLock { s.listImages() }
+        } catch (e: Exception) {
+            if (e is PtpException) recoverSession()
+            throw e
+        }
     }
 
     // Returns null when thumb is unavailable; Coil will show a placeholder.
@@ -479,12 +509,38 @@ class CameraRepository(private val usbManager: UsbManager) {
             val bytes = ptpMutex.withLock { s.getThumb(handle) }
             thumbCache.put(handle, bytes)
             bytes
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            if (e is PtpException) recoverSession()
+            null
+        }
     }
 
     suspend fun getPartialObject(handle: Long, offset: Long, maxBytes: Long): ByteArray? {
         val s = session ?: return null
-        return try { ptpMutex.withLock { s.getPartialObject(handle, offset, maxBytes) } } catch (_: Exception) { null }
+        return try {
+            ptpMutex.withLock { s.getPartialObject(handle, offset, maxBytes) }
+        } catch (e: Exception) {
+            if (e is PtpException) recoverSession()
+            null
+        }
+    }
+
+    // Resets the session without closing the USB transport so the activationLoop
+    // can re-open a PTP session on the existing connection.  Called after a
+    // transport-level error (bulkOut/bulkIn failure) that leaves the USB endpoint
+    // in an inconsistent state.
+    private fun recoverSession() {
+        if (_state.value != ConnectionState.READY) return
+        _state.value = ConnectionState.USB_CONNECTED  // prevents concurrent recovery
+        repoScope.launch {
+            stopPolling()
+            session = null
+            transport?.let { t ->
+                try { withContext(Dispatchers.IO) { t.drainIn() } } catch (_: Exception) {}
+            }
+            activationJob?.cancel()
+            activationJob = repoScope.launch { activationLoop() }
+        }
     }
 
     suspend fun downloadObject(handle: Long, out: OutputStream) {

@@ -80,7 +80,13 @@ class PtpTransport(
     suspend fun bulkOut(data: ByteArray): Int = withContext(Dispatchers.IO) {
         val conn = connection ?: return@withContext -1
         val ep = epOut ?: return@withContext -1
-        conn.bulkTransfer(ep, data, data.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+        var n = conn.bulkTransfer(ep, data, data.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+        // OUT endpoint stalled: clear halt and retry once (mirrors libgphoto2 usb.c)
+        if (n < 0) {
+            clearHalt(conn, ep)
+            n = conn.bulkTransfer(ep, data, data.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+        }
+        n
     }
 
     /** Returns the received bytes, or null on timeout / error. */
@@ -89,7 +95,15 @@ class PtpTransport(
             val conn = connection ?: return@withContext null
             val ep = epIn ?: return@withContext null
             val buf = ByteArray(maxLength)
-            val n = conn.bulkTransfer(ep, buf, buf.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+            var n = conn.bulkTransfer(ep, buf, buf.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+            // ZLP: camera signals end-of-transfer with a zero-length packet; retry once
+            if (n == 0)
+                n = conn.bulkTransfer(ep, buf, buf.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+            // IN endpoint stalled: clear halt and retry once (mirrors libgphoto2 usb.c)
+            if (n < 0) {
+                clearHalt(conn, ep)
+                n = conn.bulkTransfer(ep, buf, buf.size, PtpConstants.TRANSFER_TIMEOUT_MS)
+            }
             if (n < 0) null else buf.copyOf(n)
         }
 
@@ -115,6 +129,17 @@ class PtpTransport(
         val buf = ByteArray(64)
         val n = conn.bulkTransfer(ep, buf, buf.size, PtpConstants.INTERRUPT_TIMEOUT_MS)
         if (n < 0) null else buf.copyOf(n)
+    }
+
+    /** Sends USB CLEAR_FEATURE(ENDPOINT_HALT) to unstall an endpoint. */
+    private fun clearHalt(conn: UsbDeviceConnection, ep: UsbEndpoint) {
+        conn.controlTransfer(
+            0x02,       // bmRequestType: standard | host-to-device | endpoint
+            0x01,       // bRequest: CLEAR_FEATURE
+            0x0000,     // wValue: ENDPOINT_HALT
+            ep.address, // wIndex: endpoint address (direction bit included)
+            null, 0, 1000,
+        )
     }
 
     private fun findStillImageInterface(): UsbInterface? =

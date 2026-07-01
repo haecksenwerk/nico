@@ -32,6 +32,7 @@ object PtpConstants {
     const val OP_NIKON_DEVICE_READY = 0x90C8
     const val OP_NIKON_AF_DRIVE = 0x90C1        // PTP_OC_NIKON_AfDrive — no params, no data
     const val OP_NIKON_CHANGE_AF_AREA = 0x9205  // 2 params: x, y in LiveView pixel coords; LiveView must be active
+    const val OP_NIKON_AF_DRIVE_CANCEL = 0x9206 // PTP_OC_NIKON_AfDriveCancel — abort in-progress AF search
     const val OP_NIKON_START_LIVEVIEW = 0x9201
     const val OP_NIKON_END_LIVEVIEW = 0x9202
     const val OP_NIKON_GET_LIVEVIEW_IMG = 0x9203
@@ -43,6 +44,12 @@ object PtpConstants {
     const val RC_OK = 0x2001
     const val RC_DEVICE_BUSY = 0x2019
     const val RC_SESSION_ALREADY_OPEN = 0x201E
+
+    // Nikon-specific DeviceReady (0x90C8) return codes, per libgphoto2 nikon_wait_busy():
+    // 0xA200 = camera is doing a bulb exposure → keep polling (same as DeviceBusy)
+    // 0xA201 = silent-shutter mode, camera is ready → treat as RC_OK
+    const val RC_NIKON_BULB_RELEASE_BUSY = 0xA200
+    const val RC_NIKON_SILENT_RELEASE_BUSY = 0xA201
 
     // Device property codes
     const val PROP_BATTERY_LEVEL = 0x5001   // UINT8,  read-only, 0–100
