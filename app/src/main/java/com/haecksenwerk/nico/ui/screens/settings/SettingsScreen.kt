@@ -65,9 +65,9 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            // ─── Camera ───────────────────────────────────────────────────────
+            // ─── Camera Screen ─────────────────────────────────────────────────
             item {
-                SectionHeader(title = "Camera")
+                SectionHeader(title = "Camera Screen")
 
                 SettingsCard {
                     SwitchRow(
@@ -84,7 +84,7 @@ fun SettingsScreen(
                         },
                     )
                     SegmentedButtonRow(
-                        title = "Camera control mode",
+                        title = "Controls",
                         options = CameraControlMode.entries,
                         selected = settings.cameraControlMode,
                         onSelect = { viewModel.setCameraControlMode(it) },
@@ -99,21 +99,6 @@ fun SettingsScreen(
                             }
                         },
                     )
-                    AnimatedVisibility(
-                        visible = settings.cameraControlMode == CameraControlMode.MF,
-                        enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(300)) +
-                                slideInVertically(initialOffsetY = { -it / 2 }, animationSpec = tween(300)),
-                        exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(220)) +
-                               slideOutVertically(targetOffsetY = { -it / 2 }, animationSpec = tween(220)),
-                    ) {
-                        SegmentedButtonRow(
-                            title = "Focus wheel sensitivity",
-                            options = listOf(20, 100, 500),
-                            selected = settings.mfStepWidth,
-                            onSelect = { viewModel.setMfStepWidth(it) },
-                            labelOf = { when (it) { 20 -> "Low"; 100 -> "Med"; else -> "High" } },
-                        )
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

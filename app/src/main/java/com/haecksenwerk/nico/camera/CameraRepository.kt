@@ -29,6 +29,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 enum class ConnectionState { IDLE, DETECTING, CONNECTING, USB_CONNECTED, READY, CAPTURING, ERROR }
 
+/** Outcome of a manual-focus drive: the lens moved, hit the near/far end, or didn't move. */
+enum class MfDriveResult { MOVED, LIMIT_REACHED, NO_MOVE }
+
 /** PTP data type and enumerated allowed values for a device property. */
 data class PropDescResult(val dataType: Int, val values: List<Long>)
 
@@ -261,30 +264,36 @@ class CameraRepository(private val usbManager: UsbManager) {
      * Polls DeviceReady up to 1.5 s to wait for the drive to complete.
      * Silently ignores step-limit and step-too-small responses.
      */
-    suspend fun driveManualFocus(direction: Int, steps: Int) {
-        val s = session ?: return
+    suspend fun driveManualFocus(direction: Int, steps: Int): MfDriveResult {
+        val s = session ?: return MfDriveResult.NO_MOVE
         try {
             val resp = ptpMutex.withLock { s.mfDrive(direction, steps.coerceAtLeast(1)) }
-            if (resp.code != PtpConstants.RC_OK) return
+            when (resp.code) {
+                PtpConstants.RC_OK -> { /* drive accepted — poll for completion below */ }
+                PtpConstants.RC_NIKON_MF_DRIVE_STEP_END -> return MfDriveResult.LIMIT_REACHED
+                else -> return MfDriveResult.NO_MOVE
+            }
             repeat(30) {
                 delay(50.milliseconds)
                 val code = try {
                     ptpMutex.withLock { s.deviceReadyCode() }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    return
+                    return MfDriveResult.NO_MOVE
                 }
                 when (code) {
                     PtpConstants.RC_OK,
-                    PtpConstants.RC_NIKON_SILENT_RELEASE_BUSY,
-                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_END,
-                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_INSUF -> return
+                    PtpConstants.RC_NIKON_SILENT_RELEASE_BUSY -> return MfDriveResult.MOVED
+                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_END -> return MfDriveResult.LIMIT_REACHED
+                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_INSUF -> return MfDriveResult.NO_MOVE
                     PtpConstants.RC_DEVICE_BUSY -> { /* keep polling */ }
-                    else -> return
+                    else -> return MfDriveResult.MOVED
                 }
             }
+            return MfDriveResult.MOVED   // timed out waiting; assume the lens moved
         } catch (e: Exception) {
             if (e is CancellationException) throw e
+            return MfDriveResult.NO_MOVE
         }
     }
 

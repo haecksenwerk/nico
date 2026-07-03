@@ -58,6 +58,8 @@ data class CameraUiState(
     val errorMessage: String? = null,
     val liveViewActive: Boolean = false,
     val focusPeakingEnabled: Boolean = false,
+    val mfNearLimit: Boolean = false,
+    val mfFarLimit: Boolean = false,
     val modeEdit:     EditableProperty = EditableProperty(),
     val isoEdit:      EditableProperty = EditableProperty(),
     val focusEdit:    EditableProperty = EditableProperty(),
@@ -76,8 +78,17 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     private val _focusPeaking = MutableStateFlow(false)
     private val _peakingThreshold = MutableStateFlow(FocusPeaking.DEFAULT_THRESHOLD)
     private val _peakingColor = MutableStateFlow(FocusPeaking.COLOR_RED)
+    private val _mfNearLimit = MutableStateFlow(false)
+    private val _mfFarLimit = MutableStateFlow(false)
     private var afJob: Job? = null
     private var mfDriveJob: Job? = null
+
+    private data class MfFocusBits(
+        val focusState: FocusState,
+        val peaking: Boolean,
+        val nearLimit: Boolean,
+        val farLimit: Boolean,
+    )
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val liveViewBitmap: StateFlow<ImageBitmap?> = repository.liveViewFrame
@@ -113,11 +124,14 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         combine(repository.cameraName, _releaseDelay, _captureCountdown) { n, d, e -> Triple(n, d, e) },
         repository.propEnums,
         repository.liveViewActive,
-        combine(_focusState, _focusPeaking) { f, p -> f to p },
-    ) { tripA, tripB, propEnums, lvActive, focusAndPeaking ->
+        combine(_focusState, _focusPeaking, _mfNearLimit, _mfFarLimit) { f, p, nl, fl ->
+            MfFocusBits(f, p, nl, fl)
+        },
+    ) { tripA, tripB, propEnums, lvActive, mfBits ->
         val (state, props, error) = tripA
         val (name, delay, countdown) = tripB
-        val (focusState, peaking) = focusAndPeaking
+        val focusState = mfBits.focusState
+        val peaking = mfBits.peaking
         CameraUiState(
             connectionState = state,
             cameraName = name,
@@ -136,6 +150,8 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             errorMessage = error,
             liveViewActive = lvActive,
             focusPeakingEnabled = peaking,
+            mfNearLimit = mfBits.nearLimit,
+            mfFarLimit = mfBits.farLimit,
             modeEdit     = EditableProperty(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE),  // read-only on Z series
             isoEdit      = EditableProperty(PtpConstants.PROP_NIKON_ISO_EX),
             focusEdit    = buildEditable(PtpConstants.PROP_NIKON_FOCUS_MODE,       props.focusModeNikon.toLong(),       propEnums) { formatFocusModeNikon(it) },
@@ -197,6 +213,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
             _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
+            clearMfLimits()   // AF moved the lens; MF end-stops no longer apply
             delay(2.seconds)
             _focusState.value = FocusState.IDLE
         }
@@ -223,6 +240,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
             _focusState.value = if (found) FocusState.FOCUSED else FocusState.FAILED
+            clearMfLimits()   // AF moved the lens; MF end-stops no longer apply
             delay(2.seconds)
             _focusState.value = FocusState.IDLE
         }
@@ -231,7 +249,28 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     fun onMfDrive(direction: Int, steps: Int) {
         if (uiState.value.connectionState != ConnectionState.READY) return
         if (mfDriveJob?.isActive == true) return   // drop if previous drive still in progress
-        mfDriveJob = viewModelScope.launch { repository.driveManualFocus(direction, steps) }
+        mfDriveJob = viewModelScope.launch {
+            val near = direction == PtpConstants.MF_DIRECTION_NEAR
+            when (repository.driveManualFocus(direction, steps)) {
+                // Focus hit the near/far end — flag that direction, clear the opposite.
+                MfDriveResult.LIMIT_REACHED -> {
+                    _mfNearLimit.value = near
+                    _mfFarLimit.value = !near
+                }
+                // The lens actually moved, so we are no longer parked at either end.
+                MfDriveResult.MOVED -> {
+                    _mfNearLimit.value = false
+                    _mfFarLimit.value = false
+                }
+                // Step too small / no response — leave the limit flags unchanged.
+                MfDriveResult.NO_MOVE -> {}
+            }
+        }
+    }
+
+    private fun clearMfLimits() {
+        _mfNearLimit.value = false
+        _mfFarLimit.value = false
     }
 
     fun onPropertySelected(propCode: Int, index: Int) {

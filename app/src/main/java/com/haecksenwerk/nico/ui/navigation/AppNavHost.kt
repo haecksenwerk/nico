@@ -103,6 +103,9 @@ fun AppNavHost(
                         onAfAreaSelected = onAfAreaSelected,
                         cameraControlMode = settings.cameraControlMode,
                         onMfDrive = { dir -> onMfDrive(dir, settings.mfStepWidth) },
+                        peakingColor = settings.peakingColor,
+                        mfSensitivity = settings.mfStepWidth,
+                        onMfSensSelected = { settingsViewModel.setMfStepWidth(it) },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

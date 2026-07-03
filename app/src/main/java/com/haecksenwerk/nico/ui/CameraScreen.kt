@@ -44,6 +44,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
@@ -57,6 +58,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -77,7 +79,9 @@ import com.haecksenwerk.nico.camera.CameraUiState
 import com.haecksenwerk.nico.camera.ConnectionState
 import com.haecksenwerk.nico.camera.EditableProperty
 import com.haecksenwerk.nico.camera.FocusState
+import com.haecksenwerk.nico.camera.FocusPeaking
 import com.haecksenwerk.nico.domain.CameraControlMode
+import com.haecksenwerk.nico.domain.PeakingColor
 import com.haecksenwerk.nico.ptp.PtpConstants
 import com.haecksenwerk.nico.ui.theme.NicoTheme
 import kotlin.math.abs
@@ -95,6 +99,21 @@ private val PastelGreen   = Color(0xFFA5D6A7)
 
 private val RELEASE_DELAYS = listOf(0, 2, 5, 10)
 
+// MF focus sensitivity = drive steps per wheel notch, ordered Low → Medium → High.
+// Matches the values persisted in NicoSettings.mfStepWidth.
+private val MF_SENS_LEVELS = listOf(60, 300, 1200)
+
+// The peaking toggle button tints itself with the same colour the overlay uses, so the
+// ARGB values stay sourced from FocusPeaking (single source of truth with the processor).
+private fun PeakingColor.toOverlayColor(): Color = Color(
+    when (this) {
+        PeakingColor.RED -> FocusPeaking.COLOR_RED
+        PeakingColor.YELLOW -> FocusPeaking.COLOR_YELLOW
+        PeakingColor.BLUE -> FocusPeaking.COLOR_BLUE
+        PeakingColor.WHITE -> FocusPeaking.COLOR_WHITE
+    }
+)
+
 // ── Root composable ───────────────────────────────────────────────────────────
 
 @Composable
@@ -111,10 +130,14 @@ fun CameraScreen(
     onAfAreaSelected: (Float, Float) -> Unit,
     cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
     onMfDrive: (direction: Int) -> Unit = {},
+    peakingColor: PeakingColor = PeakingColor.RED,
+    mfSensitivity: Int = MF_SENS_LEVELS[1],
+    onMfSensSelected: (Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isReady = uiState.connectionState == ConnectionState.READY ||
             uiState.connectionState == ConnectionState.CAPTURING
+    val peakColor = peakingColor.toOverlayColor()
 
     Column(
         modifier = modifier
@@ -133,6 +156,7 @@ fun CameraScreen(
                 uiState = uiState,
                 liveViewBitmap = liveViewBitmap,
                 peakingOverlay = peakingOverlay,
+                peakingColor = peakColor,
                 onPropertySelected = onPropertySelected,
                 onLiveViewToggle = onLiveViewToggle,
                 onFocusPeakingToggle = onFocusPeakingToggle,
@@ -158,10 +182,26 @@ fun CameraScreen(
                 enabled = uiState.connectionState == ConnectionState.READY,
             )
         } else {
-            MfWheel(
-                enabled = uiState.connectionState == ConnectionState.READY,
-                onDrive = onMfDrive,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                // Balances the sensitivity button on the right so the wheel stays centred.
+                Spacer(Modifier.width(52.dp))
+                MfWheel(
+                    enabled = uiState.connectionState == ConnectionState.READY,
+                    onDrive = onMfDrive,
+                    nearLimit = uiState.mfNearLimit,
+                    farLimit = uiState.mfFarLimit,
+                    modifier = Modifier.weight(1f),
+                )
+                MfSensButton(
+                    enabled = uiState.connectionState == ConnectionState.READY,
+                    stepWidth = mfSensitivity,
+                    onSelect = onMfSensSelected,
+                )
+            }
         }
 
         Spacer(Modifier.height(36.dp))
@@ -353,6 +393,7 @@ private fun SettingsPanel(
     uiState: CameraUiState,
     liveViewBitmap: ImageBitmap?,
     peakingOverlay: ImageBitmap?,
+    peakingColor: Color,
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
     onFocusPeakingToggle: () -> Unit,
@@ -365,6 +406,7 @@ private fun SettingsPanel(
             bitmap = liveViewBitmap,
             peakingOverlay = peakingOverlay,
             peakingEnabled = uiState.focusPeakingEnabled,
+            peakingColor = peakingColor,
             cameraName = uiState.cameraName,
             onToggle = onLiveViewToggle,
             onPeakingToggle = onFocusPeakingToggle,
@@ -620,6 +662,7 @@ private fun LiveViewArea(
     bitmap: ImageBitmap?,
     peakingOverlay: ImageBitmap?,
     peakingEnabled: Boolean,
+    peakingColor: Color,
     cameraName: String,
     onToggle: () -> Unit,
     onPeakingToggle: () -> Unit,
@@ -671,18 +714,25 @@ private fun LiveViewArea(
                         modifier = Modifier
                             .height(30.dp)
                             .clip(RoundedCornerShape(10.dp))
+                            // Solid chip in the peaking colour when active, with a neutral
+                            // outline + contrast-picked label so light colours (e.g. white)
+                            // stay visible in light theme.
                             .border(
                                 width = 1.dp,
-                                color = if (peakingEnabled) ColorRed.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline,
+                                color = MaterialTheme.colorScheme.outline,
                                 shape = RoundedCornerShape(10.dp),
                             )
-                            .background(if (peakingEnabled) ColorRed.copy(alpha = 0.15f) else Color.Transparent)
+                            .background(if (peakingEnabled) peakingColor.copy(alpha = 0.5f) else Color.Transparent)
                             .clickable(onClick = onPeakingToggle)
                             .padding(horizontal = 8.dp),
                     ) {
                         Text(
                             text = "PEAK",
-                            color = if (peakingEnabled) ColorRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = when {
+                                !peakingEnabled -> MaterialTheme.colorScheme.onSurfaceVariant
+                                peakingColor.luminance() > 0.5f -> Color(0xFF111111)
+                                else -> Color.White
+                            },
                             fontSize = 9.sp,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
@@ -908,12 +958,64 @@ private fun FocusButton(
     }
 }
 
+// ── MF sensitivity button ─────────────────────────────────────────────────────
+// Circular control next to the MF wheel (diameter = wheel height).  Ascending bars
+// show the current level (Low/Med/High); tapping cycles to the next.
+
+@Composable
+private fun MfSensButton(
+    enabled: Boolean,
+    stepWidth: Int,
+    onSelect: (Int) -> Unit,
+) {
+    // Nearest match so a legacy persisted step width still maps to a sensible level.
+    val index = MF_SENS_LEVELS.indices.minByOrNull { abs(MF_SENS_LEVELS[it] - stepWidth) } ?: 1
+    val level = index + 1                       // 1 (Low) … 3 (High)
+    val inactive = MaterialTheme.colorScheme.onSurfaceVariant
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(52.dp)
+            .clip(CircleShape)
+            .background(
+                if (enabled) MaterialTheme.colorScheme.surfaceContainerHigh
+                else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.4f)
+            )
+            .then(
+                if (enabled)
+                    Modifier.clickable { onSelect(MF_SENS_LEVELS[(index + 1) % MF_SENS_LEVELS.size]) }
+                else Modifier
+            ),
+    ) {
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            listOf(8.dp, 13.dp, 18.dp).forEachIndexed { i, barHeight ->
+                Box(
+                    modifier = Modifier
+                        .width(5.dp)
+                        .height(barHeight)
+                        .clip(RoundedCornerShape(1.5.dp))
+                        .background(
+                            if (i < level && enabled) AccentYellow
+                            else inactive.copy(alpha = if (enabled) 0.3f else 0.15f)
+                        ),
+                )
+            }
+        }
+    }
+}
+
 // ── MF focus wheel ────────────────────────────────────────────────────────────
 
 @Composable
 private fun MfWheel(
     enabled: Boolean,
     onDrive: (direction: Int) -> Unit,
+    nearLimit: Boolean = false,
+    farLimit: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -921,10 +1023,12 @@ private fun MfWheel(
     var visualOffset by remember { mutableFloatStateOf(0f) }
     val tickColor = MaterialTheme.colorScheme.onSurfaceVariant
     val tickSpacingDp = 20.dp
+    // Read live inside the long-running gesture handler without restarting it.
+    val nearLimitState = rememberUpdatedState(nearLimit)
+    val farLimitState = rememberUpdatedState(farLimit)
 
     Box(
         modifier = modifier
-            .fillMaxWidth()
             .height(52.dp)
             .clip(RoundedCornerShape(26.dp))
             .background(
@@ -939,6 +1043,12 @@ private fun MfWheel(
                     onDragCancel = { cumulativeDrag = 0f },
                 ) { change, dragAmount ->
                     change.consume()
+                    // At the near/far focus limit the wheel refuses to scroll further
+                    // that way, so the ticks visibly stop turning. (drag+ = FAR, drag- = NEAR)
+                    if ((dragAmount > 0f && farLimitState.value) || (dragAmount < 0f && nearLimitState.value)) {
+                        cumulativeDrag = 0f
+                        return@detectHorizontalDragGestures
+                    }
                     visualOffset += dragAmount
                     cumulativeDrag += dragAmount
                     while (cumulativeDrag >= thresholdPx) {

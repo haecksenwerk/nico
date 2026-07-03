@@ -46,7 +46,7 @@ class SettingsDataStore(private val context: Context) {
             thumbnailsPerRow = (prefs[Keys.THUMBNAILS_PER_ROW] ?: 3).coerceIn(2, 4),
             cameraControlMode = runCatching { CameraControlMode.valueOf(prefs[Keys.CAMERA_CONTROL_MODE] ?: "") }
                 .getOrDefault(CameraControlMode.TIMER),
-            mfStepWidth = prefs[Keys.MF_STEP_WIDTH] ?: 100,
+            mfStepWidth = prefs[Keys.MF_STEP_WIDTH] ?: 300,
             peakingSensitivity = runCatching { PeakingSensitivity.valueOf(prefs[Keys.PEAKING_SENSITIVITY] ?: "") }
                 .getOrDefault(PeakingSensitivity.MEDIUM),
             peakingColor = runCatching { PeakingColor.valueOf(prefs[Keys.PEAKING_COLOR] ?: "") }

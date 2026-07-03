@@ -16,7 +16,7 @@ data class NicoSettings(
     val showFormatBadges: Boolean = true,
     val thumbnailsPerRow: Int = 3,
     val cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
-    val mfStepWidth: Int = 100,
+    val mfStepWidth: Int = 300,
     val peakingSensitivity: PeakingSensitivity = PeakingSensitivity.MEDIUM,
     val peakingColor: PeakingColor = PeakingColor.RED,
 )
