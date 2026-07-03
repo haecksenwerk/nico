@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import com.haecksenwerk.nico.domain.CameraControlMode
 import com.haecksenwerk.nico.domain.ThemeColor
 import com.haecksenwerk.nico.domain.ThemeMode
 import com.haecksenwerk.nico.ui.theme.CUSTOM_SWATCH_COLORS
@@ -80,6 +81,37 @@ fun SettingsScreen(
                             )
                         },
                     )
+                    SegmentedButtonRow(
+                        title = "Camera control mode",
+                        options = CameraControlMode.entries,
+                        selected = settings.cameraControlMode,
+                        onSelect = { viewModel.setCameraControlMode(it) },
+                        labelOf = { mode -> if (mode == CameraControlMode.MF) "MF" else "" },
+                        iconOf = { mode ->
+                            if (mode == CameraControlMode.TIMER) {
+                                Icon(
+                                    imageVector = Icons.Default.Timer,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(SegmentedButtonDefaults.IconSize),
+                                )
+                            }
+                        },
+                    )
+                    AnimatedVisibility(
+                        visible = settings.cameraControlMode == CameraControlMode.MF,
+                        enter = expandVertically(expandFrom = Alignment.Top, animationSpec = tween(300)) +
+                                slideInVertically(initialOffsetY = { -it / 2 }, animationSpec = tween(300)),
+                        exit = shrinkVertically(shrinkTowards = Alignment.Top, animationSpec = tween(220)) +
+                               slideOutVertically(targetOffsetY = { -it / 2 }, animationSpec = tween(220)),
+                    ) {
+                        SegmentedButtonRow(
+                            title = "Focus wheel sensitivity",
+                            options = listOf(20, 100, 500),
+                            selected = settings.mfStepWidth,
+                            onSelect = { viewModel.setMfStepWidth(it) },
+                            labelOf = { when (it) { 20 -> "Low"; 100 -> "Med"; else -> "High" } },
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

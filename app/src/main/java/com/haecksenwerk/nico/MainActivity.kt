@@ -113,6 +113,7 @@ class MainActivity : ComponentActivity() {
                     onPropertySelected = viewModel::onPropertySelected,
                     onLiveViewToggle = viewModel::onLiveViewToggle,
                     onAfAreaSelected = viewModel::onAfAreaSelected,
+                    onMfDrive = viewModel::onMfDrive,
                     settingsViewModel = settingsViewModel,
                     browserViewModel = browserViewModel,
                     modifier = Modifier.fillMaxSize(),

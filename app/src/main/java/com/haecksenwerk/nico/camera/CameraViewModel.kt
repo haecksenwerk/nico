@@ -71,6 +71,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     private val _captureCountdown = MutableStateFlow(0)
     private val _focusState = MutableStateFlow(FocusState.IDLE)
     private var afJob: Job? = null
+    private var mfDriveJob: Job? = null
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val liveViewBitmap: StateFlow<ImageBitmap?> = repository.liveViewFrame
@@ -141,6 +142,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         if (uiState.value.connectionState != ConnectionState.READY) return
         val prev = afJob
         afJob = viewModelScope.launch {
+            mfDriveJob?.cancelAndJoin()  // stop any MF drive + its DeviceReady polling first
             prev?.cancelAndJoin()   // wait for AfDriveCancel to complete before starting new AF
             _focusState.value = FocusState.FOCUSING
             val found = repository.triggerAutofocus()
@@ -165,6 +167,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         val camY = (normY * yMax).roundToInt()
         val prev = afJob
         afJob = viewModelScope.launch {
+            mfDriveJob?.cancelAndJoin()  // stop any MF drive + its DeviceReady polling first
             prev?.cancelAndJoin()   // wait for AfDriveCancel to complete before ChangeAfArea + AfDrive
             repository.setAfArea(camX, camY)
             _focusState.value = FocusState.FOCUSING
@@ -173,6 +176,12 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             delay(2.seconds)
             _focusState.value = FocusState.IDLE
         }
+    }
+
+    fun onMfDrive(direction: Int, steps: Int) {
+        if (uiState.value.connectionState != ConnectionState.READY) return
+        if (mfDriveJob?.isActive == true) return   // drop if previous drive still in progress
+        mfDriveJob = viewModelScope.launch { repository.driveManualFocus(direction, steps) }
     }
 
     fun onPropertySelected(propCode: Int, index: Int) {

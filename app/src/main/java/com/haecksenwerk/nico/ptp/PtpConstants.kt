@@ -33,12 +33,17 @@ object PtpConstants {
     const val OP_NIKON_AF_DRIVE = 0x90C1        // PTP_OC_NIKON_AfDrive — no params, no data
     const val OP_NIKON_CHANGE_AF_AREA = 0x9205  // 2 params: x, y in LiveView pixel coords; LiveView must be active
     const val OP_NIKON_AF_DRIVE_CANCEL = 0x9206 // PTP_OC_NIKON_AfDriveCancel — abort in-progress AF search
+    const val OP_NIKON_MF_DRIVE = 0x9204       // PTP_OC_NIKON_MfDrive — 2 params: direction flag, step amount
+    const val MF_DIRECTION_NEAR = 0x1          // flag=0x1: drive toward near focus (closer)
+    const val MF_DIRECTION_FAR  = 0x2          // flag=0x2: drive toward far focus (infinity)
     const val OP_NIKON_START_LIVEVIEW = 0x9201
     const val OP_NIKON_END_LIVEVIEW = 0x9202
     const val OP_NIKON_GET_LIVEVIEW_IMG = 0x9203
 
     const val RC_NIKON_NOT_LIVEVIEW = 0xA00B
     const val RC_NIKON_OUT_OF_FOCUS = 0xA002  // returned by DeviceReady after AfDrive if AF failed
+    const val RC_NIKON_MF_DRIVE_STEP_END   = 0xA00C  // focus reached near/far limit
+    const val RC_NIKON_MF_DRIVE_STEP_INSUF = 0xA00E  // requested step amount too small to move
 
     // Response codes
     const val RC_OK = 0x2001

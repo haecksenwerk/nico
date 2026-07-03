@@ -2,6 +2,7 @@ package com.haecksenwerk.nico.domain
 
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 enum class ThemeColor { NICO, DYNAMIC, CUSTOM }
+enum class CameraControlMode { TIMER, MF }
 
 data class NicoSettings(
     val liveViewOnConnect: Boolean = false,
@@ -12,4 +13,6 @@ data class NicoSettings(
     val language: String = "system",
     val showFormatBadges: Boolean = true,
     val thumbnailsPerRow: Int = 3,
+    val cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
+    val mfStepWidth: Int = 100,
 )

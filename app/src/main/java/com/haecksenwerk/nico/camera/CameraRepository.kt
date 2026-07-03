@@ -256,6 +256,38 @@ class CameraRepository(private val usbManager: UsbManager) {
         }
     }
 
+    /**
+     * Drives manual focus by [steps] increments in [direction] (MF_DIRECTION_NEAR or MF_DIRECTION_FAR).
+     * Polls DeviceReady up to 1.5 s to wait for the drive to complete.
+     * Silently ignores step-limit and step-too-small responses.
+     */
+    suspend fun driveManualFocus(direction: Int, steps: Int) {
+        val s = session ?: return
+        try {
+            val resp = ptpMutex.withLock { s.mfDrive(direction, steps.coerceAtLeast(1)) }
+            if (resp.code != PtpConstants.RC_OK) return
+            repeat(30) {
+                delay(50.milliseconds)
+                val code = try {
+                    ptpMutex.withLock { s.deviceReadyCode() }
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    return
+                }
+                when (code) {
+                    PtpConstants.RC_OK,
+                    PtpConstants.RC_NIKON_SILENT_RELEASE_BUSY,
+                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_END,
+                    PtpConstants.RC_NIKON_MF_DRIVE_STEP_INSUF -> return
+                    PtpConstants.RC_DEVICE_BUSY -> { /* keep polling */ }
+                    else -> return
+                }
+            }
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+        }
+    }
+
     suspend fun capture() {
         val s = session ?: return
         _state.value = ConnectionState.CAPTURING

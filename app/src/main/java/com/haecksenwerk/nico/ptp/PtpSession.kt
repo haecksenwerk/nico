@@ -499,6 +499,13 @@ class PtpSession(private val transport: PtpTransport) {
     suspend fun afDrive(): PtpResponse =
         sendCommand(PtpConstants.OP_NIKON_AF_DRIVE)
 
+    /**
+     * Manual focus drive (0x9204): direction 0x1=near, 0x2=far; amount 1–32767.
+     * LiveView must be active. Call DeviceReady after to wait for completion.
+     */
+    suspend fun mfDrive(direction: Int, steps: Int): PtpResponse =
+        sendCommand(PtpConstants.OP_NIKON_MF_DRIVE, listOf(direction.toLong(), steps.toLong()))
+
     /** Cancel an in-progress AF drive (PTP_OC_NIKON_AfDriveCancel, 0x9206). Errors are ignored. */
     suspend fun afDriveCancel() {
         try { sendCommand(PtpConstants.OP_NIKON_AF_DRIVE_CANCEL) } catch (_: Exception) {}

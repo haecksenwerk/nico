@@ -18,6 +18,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.haecksenwerk.nico.browser.BrowserViewModel
 import com.haecksenwerk.nico.camera.CameraUiState
+import com.haecksenwerk.nico.domain.CameraControlMode
 import com.haecksenwerk.nico.ui.BrowserScreen
 import com.haecksenwerk.nico.ui.CameraScreen
 import com.haecksenwerk.nico.ui.DetailScreen
@@ -38,6 +39,7 @@ fun AppNavHost(
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
     onAfAreaSelected: (Float, Float) -> Unit,
+    onMfDrive: (direction: Int, steps: Int) -> Unit,
     settingsViewModel: SettingsViewModel,
     browserViewModel: BrowserViewModel,
     modifier: Modifier = Modifier,
@@ -85,6 +87,7 @@ fun AppNavHost(
                 startDestination = Screen.Camera,
             ) {
                 composable<Screen.Camera> {
+                    val settings by settingsViewModel.settings.collectAsState()
                     CameraScreen(
                         uiState = uiState,
                         liveViewBitmap = liveViewBitmap,
@@ -94,6 +97,8 @@ fun AppNavHost(
                         onPropertySelected = onPropertySelected,
                         onLiveViewToggle = onLiveViewToggle,
                         onAfAreaSelected = onAfAreaSelected,
+                        cameraControlMode = settings.cameraControlMode,
+                        onMfDrive = { dir -> onMfDrive(dir, settings.mfStepWidth) },
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +76,8 @@ import com.haecksenwerk.nico.camera.CameraUiState
 import com.haecksenwerk.nico.camera.ConnectionState
 import com.haecksenwerk.nico.camera.EditableProperty
 import com.haecksenwerk.nico.camera.FocusState
+import com.haecksenwerk.nico.domain.CameraControlMode
+import com.haecksenwerk.nico.ptp.PtpConstants
 import com.haecksenwerk.nico.ui.theme.NicoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -102,6 +106,8 @@ fun CameraScreen(
     onPropertySelected: (propCode: Int, index: Int) -> Unit,
     onLiveViewToggle: () -> Unit,
     onAfAreaSelected: (Float, Float) -> Unit,
+    cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
+    onMfDrive: (direction: Int) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val isReady = uiState.connectionState == ConnectionState.READY ||
@@ -140,11 +146,18 @@ fun CameraScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        ReleaseDelaySelector(
-            selected = uiState.releaseDelaySec,
-            onSelected = onDelaySelected,
-            enabled = uiState.connectionState == ConnectionState.READY,
-        )
+        if (cameraControlMode == CameraControlMode.TIMER) {
+            ReleaseDelaySelector(
+                selected = uiState.releaseDelaySec,
+                onSelected = onDelaySelected,
+                enabled = uiState.connectionState == ConnectionState.READY,
+            )
+        } else {
+            MfWheel(
+                enabled = uiState.connectionState == ConnectionState.READY,
+                onDrive = onMfDrive,
+            )
+        }
 
         Spacer(Modifier.height(36.dp))
 
@@ -162,8 +175,6 @@ fun CameraScreen(
                 )
             }
             Box(modifier = Modifier.fillMaxWidth()) {
-                // Focus button: horizontally centred in the left half, which puts it
-                // midway between the left screen border and the shutter button centre.
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.27f)
@@ -351,7 +362,7 @@ private fun SettingsPanel(
             modifier = Modifier.fillMaxWidth(),
         )
 
-        Spacer(Modifier.height(44.dp))
+        Spacer(Modifier.height(20.dp))
 
         TileRow {
             EditableTile("MODE",    uiState.exposureModeDisplay, uiState.modeEdit,    onPropertySelected, Modifier.weight(1f))
@@ -818,7 +829,7 @@ private fun FocusButton(
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
         contentPadding = PaddingValues(0.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+        elevation = null,
     ) {
         when (focusState) {
             FocusState.FOCUSING -> CircularProgressIndicator(
@@ -831,6 +842,92 @@ private fun FocusButton(
                     .size(24.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF111111).copy(alpha = if (enabled) 0.2f else 0f)),
+            )
+        }
+    }
+}
+
+// ── MF focus wheel ────────────────────────────────────────────────────────────
+
+@Composable
+private fun MfWheel(
+    enabled: Boolean,
+    onDrive: (direction: Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    var cumulativeDrag by remember { mutableFloatStateOf(0f) }
+    var visualOffset by remember { mutableFloatStateOf(0f) }
+    val tickColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val tickSpacingDp = 20.dp
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(52.dp)
+            .clip(RoundedCornerShape(26.dp))
+            .background(
+                if (enabled) MaterialTheme.colorScheme.surfaceContainerHigh
+                else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.4f)
+            )
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                val thresholdPx = tickSpacingDp.toPx()
+                detectHorizontalDragGestures(
+                    onDragEnd = { cumulativeDrag = 0f },
+                    onDragCancel = { cumulativeDrag = 0f },
+                ) { change, dragAmount ->
+                    change.consume()
+                    visualOffset += dragAmount
+                    cumulativeDrag += dragAmount
+                    while (cumulativeDrag >= thresholdPx) {
+                        cumulativeDrag -= thresholdPx
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDrive(PtpConstants.MF_DIRECTION_FAR)
+                    }
+                    while (cumulativeDrag <= -thresholdPx) {
+                        cumulativeDrag += thresholdPx
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onDrive(PtpConstants.MF_DIRECTION_NEAR)
+                    }
+                }
+            },
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val tickSpacingPx = tickSpacingDp.toPx()
+            val majorSpacingPx = tickSpacingPx * 4f
+
+            val minorOffset = ((visualOffset % tickSpacingPx) + tickSpacingPx) % tickSpacingPx
+            val majorOffset = ((visualOffset % majorSpacingPx) + majorSpacingPx) % majorSpacingPx
+
+            var x = minorOffset - tickSpacingPx
+            while (x <= size.width + tickSpacingPx) {
+                drawLine(
+                    color = tickColor.copy(alpha = if (enabled) 0.28f else 0.12f),
+                    start = Offset(x, size.height * 0.32f),
+                    end   = Offset(x, size.height * 0.68f),
+                    strokeWidth = 1f,
+                )
+                x += tickSpacingPx
+            }
+
+            x = majorOffset - majorSpacingPx
+            while (x <= size.width + majorSpacingPx) {
+                drawLine(
+                    color = tickColor.copy(alpha = if (enabled) 0.6f else 0.25f),
+                    start = Offset(x, size.height * 0.15f),
+                    end   = Offset(x, size.height * 0.85f),
+                    strokeWidth = 1.5f,
+                )
+                x += majorSpacingPx
+            }
+
+            // Fixed centre notch
+            drawLine(
+                color = AccentYellow.copy(alpha = if (enabled) 1f else 0.4f),
+                start = Offset(size.width / 2f, 0f),
+                end   = Offset(size.width / 2f, size.height),
+                strokeWidth = 2f,
             )
         }
     }
@@ -857,7 +954,7 @@ private fun ShutterButton(
             disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
         ),
         contentPadding = PaddingValues(0.dp),
-        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp),
+        elevation = null,
     ) {
         when {
             countdown > 0 -> {
@@ -918,6 +1015,40 @@ fun PreviewReady() {
             onLiveViewToggle = {},
             onAfAreaSelected = { _, _ -> },
             liveViewBitmap = null,
+            cameraControlMode = CameraControlMode.TIMER,
+            onMfDrive = {},
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF141414)
+@Composable
+fun PreviewMfMode() {
+    NicoTheme {
+        CameraScreen(
+            uiState = CameraUiState(
+                connectionState = ConnectionState.READY,
+                cameraName = "Z fc",
+                batteryLevel = 72,
+                exposureModeDisplay = "M",
+                fNumberDisplay = "f/1.8",
+                shutterDisplay = "1/100",
+                isoDisplay = "ISO 800",
+                exposureBiasDisplay = "±0",
+                wbDisplay = "Auto",
+                meteringDisplay = "Matrix",
+                focusModeDisplay = "MF",
+                releaseDelaySec = 0,
+            ),
+            onCaptureClicked = {},
+            onFocusClicked = {},
+            onDelaySelected = {},
+            onPropertySelected = { _, _ -> },
+            onLiveViewToggle = {},
+            onAfAreaSelected = { _, _ -> },
+            liveViewBitmap = null,
+            cameraControlMode = CameraControlMode.MF,
+            onMfDrive = {},
         )
     }
 }

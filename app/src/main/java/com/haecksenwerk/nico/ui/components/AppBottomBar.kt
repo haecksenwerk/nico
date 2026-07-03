@@ -33,6 +33,27 @@ fun AppBottomBar(
     onNavigate: (Screen) -> Unit,
 ) {
     NavigationBar {
+        // Browser (stays selected on Detail sub-screen)
+        val browserSelected = currentDestination?.hasRoute(Screen.Browser::class) == true ||
+            currentDestination?.hasRoute(Screen.Detail::class) == true
+        val browserScale by animateFloatAsState(
+            targetValue = if (browserSelected) 1.2f else 1f,
+            animationSpec = tween(300),
+            label = "browser_scale",
+        )
+        NavigationBarItem(
+            selected = browserSelected,
+            onClick = { onNavigate(Screen.Browser) },
+            icon = {
+                Icon(
+                    imageVector = if (browserSelected) Icons.Default.PhotoLibrary else Icons.Outlined.PhotoLibrary,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp).scale(browserScale),
+                )
+            },
+            label = { Text("Photos") },
+        )
+
         // Camera
         val cameraSelected = currentDestination?.hasRoute(Screen.Camera::class) == true
         val cameraScale = remember { Animatable(1f) }
@@ -54,27 +75,6 @@ fun AppBottomBar(
                 )
             },
             label = { Text("Camera") },
-        )
-
-        // Browser (stays selected on Detail sub-screen)
-        val browserSelected = currentDestination?.hasRoute(Screen.Browser::class) == true ||
-            currentDestination?.hasRoute(Screen.Detail::class) == true
-        val browserScale by animateFloatAsState(
-            targetValue = if (browserSelected) 1.2f else 1f,
-            animationSpec = tween(300),
-            label = "browser_scale",
-        )
-        NavigationBarItem(
-            selected = browserSelected,
-            onClick = { onNavigate(Screen.Browser) },
-            icon = {
-                Icon(
-                    imageVector = if (browserSelected) Icons.Default.PhotoLibrary else Icons.Outlined.PhotoLibrary,
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp).scale(browserScale),
-                )
-            },
-            label = { Text("Photos") },
         )
 
         // Settings (stays selected on AppInfo / LegalInfo / Licenses sub-screens)
