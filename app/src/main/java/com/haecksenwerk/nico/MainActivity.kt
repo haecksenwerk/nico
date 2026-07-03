@@ -95,6 +95,8 @@ class MainActivity : ComponentActivity() {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 settingsViewModel.settings.collect { settings ->
                     repository.liveViewOnConnect = settings.liveViewOnConnect
+                    viewModel.setPeakingSensitivity(settings.peakingSensitivity)
+                    viewModel.setPeakingColor(settings.peakingColor)
                 }
             }
         }
@@ -104,14 +106,17 @@ class MainActivity : ComponentActivity() {
             NicoTheme(settings = settings) {
                 val uiState by viewModel.uiState.collectAsState()
                 val liveViewBitmap by viewModel.liveViewBitmap.collectAsState()
+                val peakingOverlay by viewModel.peakingOverlay.collectAsState()
                 AppNavHost(
                     uiState = uiState,
                     liveViewBitmap = liveViewBitmap,
+                    peakingOverlay = peakingOverlay,
                     onCaptureClicked = viewModel::onCaptureClicked,
                     onFocusClicked = viewModel::onFocusClicked,
                     onDelaySelected = viewModel::onDelaySelected,
                     onPropertySelected = viewModel::onPropertySelected,
                     onLiveViewToggle = viewModel::onLiveViewToggle,
+                    onFocusPeakingToggle = viewModel::onFocusPeakingToggle,
                     onAfAreaSelected = viewModel::onAfAreaSelected,
                     onMfDrive = viewModel::onMfDrive,
                     settingsViewModel = settingsViewModel,

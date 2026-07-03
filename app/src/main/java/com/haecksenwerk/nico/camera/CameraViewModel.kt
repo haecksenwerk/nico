@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.haecksenwerk.nico.domain.PeakingColor
+import com.haecksenwerk.nico.domain.PeakingSensitivity
 import com.haecksenwerk.nico.ptp.PtpConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +57,7 @@ data class CameraUiState(
     val focusState: FocusState = FocusState.IDLE,
     val errorMessage: String? = null,
     val liveViewActive: Boolean = false,
+    val focusPeakingEnabled: Boolean = false,
     val modeEdit:     EditableProperty = EditableProperty(),
     val isoEdit:      EditableProperty = EditableProperty(),
     val focusEdit:    EditableProperty = EditableProperty(),
@@ -70,6 +73,9 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     private val _releaseDelay = MutableStateFlow(0)
     private val _captureCountdown = MutableStateFlow(0)
     private val _focusState = MutableStateFlow(FocusState.IDLE)
+    private val _focusPeaking = MutableStateFlow(false)
+    private val _peakingThreshold = MutableStateFlow(FocusPeaking.DEFAULT_THRESHOLD)
+    private val _peakingColor = MutableStateFlow(FocusPeaking.COLOR_RED)
     private var afJob: Job? = null
     private var mfDriveJob: Job? = null
 
@@ -81,15 +87,37 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
+    /**
+     * Focus-peaking overlay for the current LiveView frame, or null when peaking is off
+     * or the frame cannot be processed.  Recomputed per frame on a background dispatcher;
+     * stale frames are dropped via mapLatest.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val peakingOverlay: StateFlow<ImageBitmap?> =
+        combine(
+            repository.liveViewFrame,
+            _focusPeaking,
+            _peakingThreshold,
+            _peakingColor,
+        ) { bytes, on, threshold, color ->
+            Triple(bytes.takeIf { on }, threshold, color)
+        }
+            .mapLatest { (bytes, threshold, color) ->
+                bytes?.let { FocusPeaking.computeOverlay(it, threshold, color) }
+            }
+            .flowOn(Dispatchers.Default)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
     val uiState: StateFlow<CameraUiState> = combine(
         combine(repository.state, repository.properties, repository.error) { a, b, c -> Triple(a, b, c) },
         combine(repository.cameraName, _releaseDelay, _captureCountdown) { n, d, e -> Triple(n, d, e) },
         repository.propEnums,
         repository.liveViewActive,
-        _focusState,
-    ) { tripA, tripB, propEnums, lvActive, focusState ->
+        combine(_focusState, _focusPeaking) { f, p -> f to p },
+    ) { tripA, tripB, propEnums, lvActive, focusAndPeaking ->
         val (state, props, error) = tripA
         val (name, delay, countdown) = tripB
+        val (focusState, peaking) = focusAndPeaking
         CameraUiState(
             connectionState = state,
             cameraName = name,
@@ -107,6 +135,7 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             focusState = focusState,
             errorMessage = error,
             liveViewActive = lvActive,
+            focusPeakingEnabled = peaking,
             modeEdit     = EditableProperty(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE),  // read-only on Z series
             isoEdit      = EditableProperty(PtpConstants.PROP_NIKON_ISO_EX),
             focusEdit    = buildEditable(PtpConstants.PROP_NIKON_FOCUS_MODE,       props.focusModeNikon.toLong(),       propEnums) { formatFocusModeNikon(it) },
@@ -136,6 +165,27 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
 
     fun onLiveViewToggle() {
         viewModelScope.launch { repository.toggleLiveView() }
+    }
+
+    fun onFocusPeakingToggle() {
+        _focusPeaking.value = !_focusPeaking.value
+    }
+
+    fun setPeakingSensitivity(sensitivity: PeakingSensitivity) {
+        _peakingThreshold.value = when (sensitivity) {
+            PeakingSensitivity.LOW -> FocusPeaking.THRESHOLD_LOW
+            PeakingSensitivity.MEDIUM -> FocusPeaking.THRESHOLD_MEDIUM
+            PeakingSensitivity.HIGH -> FocusPeaking.THRESHOLD_HIGH
+        }
+    }
+
+    fun setPeakingColor(color: PeakingColor) {
+        _peakingColor.value = when (color) {
+            PeakingColor.RED -> FocusPeaking.COLOR_RED
+            PeakingColor.YELLOW -> FocusPeaking.COLOR_YELLOW
+            PeakingColor.BLUE -> FocusPeaking.COLOR_BLUE
+            PeakingColor.WHITE -> FocusPeaking.COLOR_WHITE
+        }
     }
 
     fun onFocusClicked() {

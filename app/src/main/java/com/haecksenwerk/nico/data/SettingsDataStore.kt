@@ -6,6 +6,8 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.haecksenwerk.nico.domain.CameraControlMode
 import com.haecksenwerk.nico.domain.NicoSettings
+import com.haecksenwerk.nico.domain.PeakingColor
+import com.haecksenwerk.nico.domain.PeakingSensitivity
 import com.haecksenwerk.nico.domain.ThemeColor
 import com.haecksenwerk.nico.domain.ThemeMode
 import kotlinx.coroutines.flow.Flow
@@ -24,6 +26,8 @@ private object Keys {
     val THUMBNAILS_PER_ROW = intPreferencesKey("thumbnails_per_row")
     val CAMERA_CONTROL_MODE = stringPreferencesKey("camera_control_mode")
     val MF_STEP_WIDTH = intPreferencesKey("mf_step_width")
+    val PEAKING_SENSITIVITY = stringPreferencesKey("peaking_sensitivity")
+    val PEAKING_COLOR = stringPreferencesKey("peaking_color")
 }
 
 class SettingsDataStore(private val context: Context) {
@@ -43,6 +47,10 @@ class SettingsDataStore(private val context: Context) {
             cameraControlMode = runCatching { CameraControlMode.valueOf(prefs[Keys.CAMERA_CONTROL_MODE] ?: "") }
                 .getOrDefault(CameraControlMode.TIMER),
             mfStepWidth = prefs[Keys.MF_STEP_WIDTH] ?: 100,
+            peakingSensitivity = runCatching { PeakingSensitivity.valueOf(prefs[Keys.PEAKING_SENSITIVITY] ?: "") }
+                .getOrDefault(PeakingSensitivity.MEDIUM),
+            peakingColor = runCatching { PeakingColor.valueOf(prefs[Keys.PEAKING_COLOR] ?: "") }
+                .getOrDefault(PeakingColor.RED),
         )
     }
 
@@ -75,4 +83,10 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setMfStepWidth(width: Int) =
         context.dataStore.edit { it[Keys.MF_STEP_WIDTH] = width }
+
+    suspend fun setPeakingSensitivity(sensitivity: PeakingSensitivity) =
+        context.dataStore.edit { it[Keys.PEAKING_SENSITIVITY] = sensitivity.name }
+
+    suspend fun setPeakingColor(color: PeakingColor) =
+        context.dataStore.edit { it[Keys.PEAKING_COLOR] = color.name }
 }

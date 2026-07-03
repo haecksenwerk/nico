@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.haecksenwerk.nico.data.SettingsDataStore
 import com.haecksenwerk.nico.domain.CameraControlMode
 import com.haecksenwerk.nico.domain.NicoSettings
+import com.haecksenwerk.nico.domain.PeakingColor
+import com.haecksenwerk.nico.domain.PeakingSensitivity
 import com.haecksenwerk.nico.domain.ThemeColor
 import com.haecksenwerk.nico.domain.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
@@ -28,6 +30,8 @@ class SettingsViewModel(private val store: SettingsDataStore) : ViewModel() {
     fun setThumbnailsPerRow(count: Int) = viewModelScope.launch { store.setThumbnailsPerRow(count) }
     fun setCameraControlMode(mode: CameraControlMode) = viewModelScope.launch { store.setCameraControlMode(mode) }
     fun setMfStepWidth(width: Int) = viewModelScope.launch { store.setMfStepWidth(width) }
+    fun setPeakingSensitivity(sensitivity: PeakingSensitivity) = viewModelScope.launch { store.setPeakingSensitivity(sensitivity) }
+    fun setPeakingColor(color: PeakingColor) = viewModelScope.launch { store.setPeakingColor(color) }
 
     companion object {
         fun Factory(context: Context): ViewModelProvider.Factory = object : ViewModelProvider.Factory {

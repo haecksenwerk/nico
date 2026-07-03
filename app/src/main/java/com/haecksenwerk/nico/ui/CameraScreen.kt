@@ -56,6 +56,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -100,11 +101,13 @@ private val RELEASE_DELAYS = listOf(0, 2, 5, 10)
 fun CameraScreen(
     uiState: CameraUiState,
     liveViewBitmap: ImageBitmap?,
+    peakingOverlay: ImageBitmap? = null,
     onCaptureClicked: () -> Unit,
     onFocusClicked: () -> Unit,
     onDelaySelected: (Int) -> Unit,
     onPropertySelected: (propCode: Int, index: Int) -> Unit,
     onLiveViewToggle: () -> Unit,
+    onFocusPeakingToggle: () -> Unit = {},
     onAfAreaSelected: (Float, Float) -> Unit,
     cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
     onMfDrive: (direction: Int) -> Unit = {},
@@ -129,8 +132,10 @@ fun CameraScreen(
             SettingsPanel(
                 uiState = uiState,
                 liveViewBitmap = liveViewBitmap,
+                peakingOverlay = peakingOverlay,
                 onPropertySelected = onPropertySelected,
                 onLiveViewToggle = onLiveViewToggle,
+                onFocusPeakingToggle = onFocusPeakingToggle,
                 onAfAreaSelected = onAfAreaSelected,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -347,8 +352,10 @@ private fun BatteryIcon(level: Int, modifier: Modifier = Modifier) {
 private fun SettingsPanel(
     uiState: CameraUiState,
     liveViewBitmap: ImageBitmap?,
+    peakingOverlay: ImageBitmap?,
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
+    onFocusPeakingToggle: () -> Unit,
     onAfAreaSelected: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -356,8 +363,11 @@ private fun SettingsPanel(
         LiveViewArea(
             isActive = uiState.liveViewActive,
             bitmap = liveViewBitmap,
+            peakingOverlay = peakingOverlay,
+            peakingEnabled = uiState.focusPeakingEnabled,
             cameraName = uiState.cameraName,
             onToggle = onLiveViewToggle,
+            onPeakingToggle = onFocusPeakingToggle,
             onAfAreaSelected = onAfAreaSelected,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -608,8 +618,11 @@ private fun ReleaseDelaySelector(
 private fun LiveViewArea(
     isActive: Boolean,
     bitmap: ImageBitmap?,
+    peakingOverlay: ImageBitmap?,
+    peakingEnabled: Boolean,
     cameraName: String,
     onToggle: () -> Unit,
+    onPeakingToggle: () -> Unit,
     onAfAreaSelected: (Float, Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -645,25 +658,59 @@ private fun LiveViewArea(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .clip(RoundedCornerShape(10.dp))
-                    .border(
-                        width = 1.dp,
-                        color = if (isActive) AccentYellow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline,
-                        shape = RoundedCornerShape(10.dp),
-                    )
-                    .background(if (isActive) AccentYellow.copy(alpha = 0.15f) else Color.Transparent)
-                    .clickable(onClick = onToggle)
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.align(Alignment.CenterEnd),
             ) {
-                Icon(
-                    imageVector = if (isActive) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                    contentDescription = if (isActive) "Stop live view" else "Start live view",
-                    tint = if (isActive) AccentYellow else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(14.dp),
-                )
+                // Focus-peaking toggle — only meaningful while live view is running.
+                // Shares a fixed height with the live-view toggle so the two pills match.
+                if (isActive) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(30.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                width = 1.dp,
+                                color = if (peakingEnabled) ColorRed.copy(alpha = 0.7f) else MaterialTheme.colorScheme.outline,
+                                shape = RoundedCornerShape(10.dp),
+                            )
+                            .background(if (peakingEnabled) ColorRed.copy(alpha = 0.15f) else Color.Transparent)
+                            .clickable(onClick = onPeakingToggle)
+                            .padding(horizontal = 8.dp),
+                    ) {
+                        Text(
+                            text = "PEAK",
+                            color = if (peakingEnabled) ColorRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                        )
+                    }
+                }
+
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .border(
+                            width = 1.dp,
+                            color = if (isActive) AccentYellow.copy(alpha = 0.6f) else MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(10.dp),
+                        )
+                        .background(if (isActive) AccentYellow.copy(alpha = 0.15f) else Color.Transparent)
+                        .clickable(onClick = onToggle)
+                        .padding(horizontal = 10.dp),
+                ) {
+                    Icon(
+                        imageVector = if (isActive) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (isActive) "Stop live view" else "Start live view",
+                        tint = if (isActive) AccentYellow else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
             }
         }
 
@@ -677,21 +724,35 @@ private fun LiveViewArea(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                isActive && bitmap != null -> Image(
-                    bitmap = bitmap,
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(onAfAreaSelected) {
-                            detectTapGestures { offset ->
-                                val normX = offset.x / size.width
-                                val normY = offset.y / size.height
-                                tapNorm = Offset(normX, normY)
-                                onAfAreaSelected(normX, normY)
-                            }
-                        },
-                )
+                isActive && bitmap != null -> {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(onAfAreaSelected) {
+                                detectTapGestures { offset ->
+                                    val normX = offset.x / size.width
+                                    val normY = offset.y / size.height
+                                    tapNorm = Offset(normX, normY)
+                                    onAfAreaSelected(normX, normY)
+                                }
+                            },
+                    )
+                    // Focus-peaking overlay — same aspect ratio + ContentScale.Fit as the
+                    // base frame, so its edge marks land exactly over the sharp regions.
+                    // FilterQuality.None keeps the upscaled edge marks crisp.
+                    if (peakingEnabled && peakingOverlay != null) {
+                        Image(
+                            bitmap = peakingOverlay,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            filterQuality = FilterQuality.None,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
                 isActive -> CircularProgressIndicator(
                     color = AccentYellow,
                     modifier = Modifier.size(28.dp),

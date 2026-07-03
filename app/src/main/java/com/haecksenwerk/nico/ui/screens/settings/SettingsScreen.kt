@@ -31,6 +31,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.haecksenwerk.nico.domain.CameraControlMode
+import com.haecksenwerk.nico.domain.PeakingColor
+import com.haecksenwerk.nico.domain.PeakingSensitivity
 import com.haecksenwerk.nico.domain.ThemeColor
 import com.haecksenwerk.nico.domain.ThemeMode
 import com.haecksenwerk.nico.ui.theme.CUSTOM_SWATCH_COLORS
@@ -112,6 +114,43 @@ fun SettingsScreen(
                             labelOf = { when (it) { 20 -> "Low"; 100 -> "Med"; else -> "High" } },
                         )
                     }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            // ─── Focus Peaking ─────────────────────────────────────────────────
+            item {
+                SectionHeader(title = "Focus Peaking")
+
+                SettingsCard {
+                    SegmentedButtonRow(
+                        title = "Sensitivity",
+                        options = PeakingSensitivity.entries,
+                        selected = settings.peakingSensitivity,
+                        onSelect = { viewModel.setPeakingSensitivity(it) },
+                        labelOf = { sensitivity ->
+                            when (sensitivity) {
+                                PeakingSensitivity.LOW -> "Low"
+                                PeakingSensitivity.MEDIUM -> "Medium"
+                                PeakingSensitivity.HIGH -> "High"
+                            }
+                        },
+                    )
+                    SegmentedButtonRow(
+                        title = "Overlay color",
+                        options = PeakingColor.entries,
+                        selected = settings.peakingColor,
+                        onSelect = { viewModel.setPeakingColor(it) },
+                        labelOf = { color ->
+                            when (color) {
+                                PeakingColor.RED -> "R"
+                                PeakingColor.YELLOW -> "Y"
+                                PeakingColor.BLUE -> "B"
+                                PeakingColor.WHITE -> "W"
+                            }
+                        },
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

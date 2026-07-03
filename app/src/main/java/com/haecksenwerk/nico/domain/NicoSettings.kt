@@ -3,6 +3,8 @@ package com.haecksenwerk.nico.domain
 enum class ThemeMode { LIGHT, DARK, SYSTEM }
 enum class ThemeColor { NICO, DYNAMIC, CUSTOM }
 enum class CameraControlMode { TIMER, MF }
+enum class PeakingSensitivity { LOW, MEDIUM, HIGH }
+enum class PeakingColor { RED, YELLOW, BLUE, WHITE }
 
 data class NicoSettings(
     val liveViewOnConnect: Boolean = false,
@@ -15,4 +17,6 @@ data class NicoSettings(
     val thumbnailsPerRow: Int = 3,
     val cameraControlMode: CameraControlMode = CameraControlMode.TIMER,
     val mfStepWidth: Int = 100,
+    val peakingSensitivity: PeakingSensitivity = PeakingSensitivity.MEDIUM,
+    val peakingColor: PeakingColor = PeakingColor.RED,
 )
