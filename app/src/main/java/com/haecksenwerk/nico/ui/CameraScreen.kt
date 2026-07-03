@@ -36,6 +36,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,9 +47,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -69,7 +74,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -83,7 +87,6 @@ import com.haecksenwerk.nico.camera.FocusPeaking
 import com.haecksenwerk.nico.domain.CameraControlMode
 import com.haecksenwerk.nico.domain.PeakingColor
 import com.haecksenwerk.nico.ptp.PtpConstants
-import com.haecksenwerk.nico.ui.theme.NicoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -102,6 +105,9 @@ private val RELEASE_DELAYS = listOf(0, 2, 5, 10)
 // MF focus sensitivity = drive steps per wheel notch, ordered Low → Medium → High.
 // Matches the values persisted in NicoSettings.mfStepWidth.
 private val MF_SENS_LEVELS = listOf(60, 300, 1200)
+
+// Shown as a transient bottom banner when a focus control is tapped while disabled by MF mode.
+private const val MF_FOCUS_HINT = "Set the camera to an AF mode to use autofocus and focus control"
 
 // The peaking toggle button tints itself with the same colour the overlay uses, so the
 // ARGB values stay sourced from FocusPeaking (single source of truth with the processor).
@@ -139,109 +145,149 @@ fun CameraScreen(
             uiState.connectionState == ConnectionState.CAPTURING
     val peakColor = peakingColor.toOverlayColor()
 
-    Column(
-        modifier = modifier
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-    ) {
-        StatusBar(
-            state = uiState.connectionState,
-            battery = uiState.batteryLevel,
-        )
+    // In Manual Focus the camera disengages the AF motor and ignores all remote focus
+    // commands (AF, focus-area selection, the drive wheel), so those controls are disabled.
+    val afControlsEnabled = uiState.connectionState == ConnectionState.READY &&
+            !uiState.cameraFocusModeMf
+    // The hint applies only when a control is disabled *because* the camera is in MF.
+    val mfHintApplicable = uiState.connectionState == ConnectionState.READY &&
+            uiState.cameraFocusModeMf
 
-        Spacer(Modifier.height(36.dp))
-
-        if (isReady) {
-            SettingsPanel(
-                uiState = uiState,
-                liveViewBitmap = liveViewBitmap,
-                peakingOverlay = peakingOverlay,
-                peakingColor = peakColor,
-                onPropertySelected = onPropertySelected,
-                onLiveViewToggle = onLiveViewToggle,
-                onFocusPeakingToggle = onFocusPeakingToggle,
-                onAfAreaSelected = onAfAreaSelected,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.weight(1f))
-        } else {
-            Box(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                IdlePanel(uiState = uiState)
-            }
+    // Tapping a disabled focus control flashes the hint in a snackbar; each tap replaces
+    // any currently showing one so the message restarts rather than queueing.
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val flashMfHint = {
+        scope.launch {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            snackbarHostState.showSnackbar(MF_FOCUS_HINT, duration = SnackbarDuration.Short)
         }
+        Unit
+    }
 
-        Spacer(Modifier.height(16.dp))
-
-        if (cameraControlMode == CameraControlMode.TIMER) {
-            ReleaseDelaySelector(
-                selected = uiState.releaseDelaySec,
-                onSelected = onDelaySelected,
-                enabled = uiState.connectionState == ConnectionState.READY,
-            )
-        } else {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                // Balances the sensitivity button on the right so the wheel stays centred.
-                Spacer(Modifier.width(52.dp))
-                MfWheel(
-                    enabled = uiState.connectionState == ConnectionState.READY,
-                    onDrive = onMfDrive,
-                    nearLimit = uiState.mfNearLimit,
-                    farLimit = uiState.mfFarLimit,
-                    modifier = Modifier.weight(1f),
-                )
-                MfSensButton(
-                    enabled = uiState.connectionState == ConnectionState.READY,
-                    stepWidth = mfSensitivity,
-                    onSelect = onMfSensSelected,
-                )
-            }
-        }
-
-        Spacer(Modifier.height(36.dp))
-
+    Box(modifier = modifier) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 16.dp),
         ) {
-            if (isReady && uiState.errorMessage != null) {
-                Text(
-                    text = uiState.errorMessage,
-                    color = ColorRed.copy(alpha = 0.85f),
-                    fontSize = 10.sp,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            StatusBar(
+                state = uiState.connectionState,
+                battery = uiState.batteryLevel,
+            )
+
+            Spacer(Modifier.height(36.dp))
+
+            if (isReady) {
+                SettingsPanel(
+                    uiState = uiState,
+                    liveViewBitmap = liveViewBitmap,
+                    peakingOverlay = peakingOverlay,
+                    peakingColor = peakColor,
+                    afAreaEnabled = !uiState.cameraFocusModeMf,
+                    onPropertySelected = onPropertySelected,
+                    onLiveViewToggle = onLiveViewToggle,
+                    onFocusPeakingToggle = onFocusPeakingToggle,
+                    onAfAreaSelected = onAfAreaSelected,
+                    modifier = Modifier.fillMaxWidth(),
                 )
-            }
-            Box(modifier = Modifier.fillMaxWidth()) {
+                Spacer(Modifier.weight(1f))
+            } else {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.27f)
-                        .align(Alignment.CenterStart),
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
-                    FocusButton(
-                        enabled = uiState.connectionState == ConnectionState.READY,
-                        focusState = uiState.focusState,
-                        onClick = onFocusClicked,
+                    IdlePanel(uiState = uiState)
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            if (cameraControlMode == CameraControlMode.TIMER) {
+                ReleaseDelaySelector(
+                    selected = uiState.releaseDelaySec,
+                    onSelected = onDelaySelected,
+                    enabled = uiState.connectionState == ConnectionState.READY,
+                )
+            } else {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    // Balances the sensitivity button on the right so the wheel stays centred.
+                    Spacer(Modifier.width(52.dp))
+                    MfWheel(
+                        enabled = afControlsEnabled,
+                        onDrive = onMfDrive,
+                        nearLimit = uiState.mfNearLimit,
+                        farLimit = uiState.mfFarLimit,
+                        onDisabledTouch = { if (mfHintApplicable) flashMfHint() },
+                        modifier = Modifier.weight(1f),
+                    )
+                    MfSensButton(
+                        enabled = afControlsEnabled,
+                        stepWidth = mfSensitivity,
+                        onSelect = onMfSensSelected,
                     )
                 }
-                ShutterButton(
-                    enabled = uiState.connectionState == ConnectionState.READY,
-                    capturing = uiState.connectionState == ConnectionState.CAPTURING,
-                    countdown = uiState.captureCountdown,
-                    onClick = onCaptureClicked,
-                    modifier = Modifier.align(Alignment.Center),
-                )
             }
-            Spacer(Modifier.height(24.dp))
+
+            Spacer(Modifier.height(36.dp))
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isReady && uiState.errorMessage != null) {
+                    Text(
+                        text = uiState.errorMessage,
+                        color = ColorRed.copy(alpha = 0.85f),
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                    )
+                }
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(0.27f)
+                            .align(Alignment.CenterStart),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FocusButton(
+                            enabled = afControlsEnabled,
+                            focusState = uiState.focusState,
+                            onClick = onFocusClicked,
+                        )
+                        // Disabled by MF: catch the tap (the Button ignores it) to flash the hint.
+                        if (mfHintApplicable) {
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(onPress = { flashMfHint() })
+                                    },
+                            )
+                        }
+                    }
+                    ShutterButton(
+                        enabled = uiState.connectionState == ConnectionState.READY,
+                        capturing = uiState.connectionState == ConnectionState.CAPTURING,
+                        countdown = uiState.captureCountdown,
+                        onClick = onCaptureClicked,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+            }
         }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 }
 
@@ -394,6 +440,7 @@ private fun SettingsPanel(
     liveViewBitmap: ImageBitmap?,
     peakingOverlay: ImageBitmap?,
     peakingColor: Color,
+    afAreaEnabled: Boolean,
     onPropertySelected: (Int, Int) -> Unit,
     onLiveViewToggle: () -> Unit,
     onFocusPeakingToggle: () -> Unit,
@@ -407,6 +454,7 @@ private fun SettingsPanel(
             peakingOverlay = peakingOverlay,
             peakingEnabled = uiState.focusPeakingEnabled,
             peakingColor = peakingColor,
+            afAreaEnabled = afAreaEnabled,
             cameraName = uiState.cameraName,
             onToggle = onLiveViewToggle,
             onPeakingToggle = onFocusPeakingToggle,
@@ -663,6 +711,7 @@ private fun LiveViewArea(
     peakingOverlay: ImageBitmap?,
     peakingEnabled: Boolean,
     peakingColor: Color,
+    afAreaEnabled: Boolean,
     cameraName: String,
     onToggle: () -> Unit,
     onPeakingToggle: () -> Unit,
@@ -781,14 +830,17 @@ private fun LiveViewArea(
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
-                            .pointerInput(onAfAreaSelected) {
-                                detectTapGestures { offset ->
-                                    val normX = offset.x / size.width
-                                    val normY = offset.y / size.height
-                                    tapNorm = Offset(normX, normY)
-                                    onAfAreaSelected(normX, normY)
-                                }
-                            },
+                            // Tap-to-focus is off in Manual Focus mode (camera ignores it).
+                            .then(
+                                if (afAreaEnabled) Modifier.pointerInput(onAfAreaSelected) {
+                                    detectTapGestures { offset ->
+                                        val normX = offset.x / size.width
+                                        val normY = offset.y / size.height
+                                        tapNorm = Offset(normX, normY)
+                                        onAfAreaSelected(normX, normY)
+                                    }
+                                } else Modifier
+                            ),
                     )
                     // Focus-peaking overlay — same aspect ratio + ContentScale.Fit as the
                     // base frame, so its edge marks land exactly over the sharp regions.
@@ -1016,6 +1068,7 @@ private fun MfWheel(
     onDrive: (direction: Int) -> Unit,
     nearLimit: Boolean = false,
     farLimit: Boolean = false,
+    onDisabledTouch: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
@@ -1036,7 +1089,11 @@ private fun MfWheel(
                 else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.4f)
             )
             .pointerInput(enabled) {
-                if (!enabled) return@pointerInput
+                if (!enabled) {
+                    // Disabled (camera in MF): report the touch so the caller can flash the hint.
+                    detectTapGestures(onPress = { onDisabledTouch() })
+                    return@pointerInput
+                }
                 val thresholdPx = tickSpacingDp.toPx()
                 detectHorizontalDragGestures(
                     onDragEnd = { cumulativeDrag = 0f },
@@ -1158,85 +1215,3 @@ private fun ShutterButton(
     }
 }
 
-// ── Preview ───────────────────────────────────────────────────────────────────
-
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
-@Composable
-fun PreviewReady() {
-    NicoTheme {
-        CameraScreen(
-            uiState = CameraUiState(
-                connectionState = ConnectionState.READY,
-                cameraName = "Z fc",
-                batteryLevel = 72,
-                exposureModeDisplay = "A",
-                fNumberDisplay = "f/2.8",
-                shutterDisplay = "1/250",
-                isoDisplay = "ISO 400",
-                exposureBiasDisplay = "-⅓",
-                wbDisplay = "Auto",
-                meteringDisplay = "Matrix",
-                focusModeDisplay = "AF-S",
-                releaseDelaySec = 2,
-            ),
-            onCaptureClicked = {},
-            onFocusClicked = {},
-            onDelaySelected = {},
-            onPropertySelected = { _, _ -> },
-            onLiveViewToggle = {},
-            onAfAreaSelected = { _, _ -> },
-            liveViewBitmap = null,
-            cameraControlMode = CameraControlMode.TIMER,
-            onMfDrive = {},
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
-@Composable
-fun PreviewMfMode() {
-    NicoTheme {
-        CameraScreen(
-            uiState = CameraUiState(
-                connectionState = ConnectionState.READY,
-                cameraName = "Z fc",
-                batteryLevel = 72,
-                exposureModeDisplay = "M",
-                fNumberDisplay = "f/1.8",
-                shutterDisplay = "1/100",
-                isoDisplay = "ISO 800",
-                exposureBiasDisplay = "±0",
-                wbDisplay = "Auto",
-                meteringDisplay = "Matrix",
-                focusModeDisplay = "MF",
-                releaseDelaySec = 0,
-            ),
-            onCaptureClicked = {},
-            onFocusClicked = {},
-            onDelaySelected = {},
-            onPropertySelected = { _, _ -> },
-            onLiveViewToggle = {},
-            onAfAreaSelected = { _, _ -> },
-            liveViewBitmap = null,
-            cameraControlMode = CameraControlMode.MF,
-            onMfDrive = {},
-        )
-    }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF141414)
-@Composable
-fun PreviewIdle() {
-    NicoTheme {
-        CameraScreen(
-            uiState = CameraUiState(connectionState = ConnectionState.IDLE),
-            liveViewBitmap = null,
-            onCaptureClicked = {},
-            onFocusClicked = {},
-            onDelaySelected = {},
-            onPropertySelected = { _, _ -> },
-            onLiveViewToggle = {},
-            onAfAreaSelected = { _, _ -> },
-        )
-    }
-}

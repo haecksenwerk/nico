@@ -60,6 +60,8 @@ data class CameraUiState(
     val focusPeakingEnabled: Boolean = false,
     val mfNearLimit: Boolean = false,
     val mfFarLimit: Boolean = false,
+    // Camera focus mode is Manual — remote MfDrive is ignored, so the in-app wheel is disabled.
+    val cameraFocusModeMf: Boolean = false,
     val modeEdit:     EditableProperty = EditableProperty(),
     val isoEdit:      EditableProperty = EditableProperty(),
     val focusEdit:    EditableProperty = EditableProperty(),
@@ -152,6 +154,8 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
             focusPeakingEnabled = peaking,
             mfNearLimit = mfBits.nearLimit,
             mfFarLimit = mfBits.farLimit,
+            cameraFocusModeMf = props.focusModeNikon == PtpConstants.NIKON_FOCUS_MODE_MF ||
+                    props.focusModeNikon == PtpConstants.NIKON_FOCUS_MODE_MF_FIXED,
             modeEdit     = EditableProperty(PtpConstants.PROP_EXPOSURE_PROGRAM_MODE),  // read-only on Z series
             isoEdit      = EditableProperty(PtpConstants.PROP_NIKON_ISO_EX),
             focusEdit    = buildEditable(PtpConstants.PROP_NIKON_FOCUS_MODE,       props.focusModeNikon.toLong(),       propEnums) { formatFocusModeNikon(it) },
@@ -360,7 +364,8 @@ class CameraViewModel(private val repository: CameraRepository) : ViewModel() {
     private fun formatFocusModeNikon(raw: Long): String = when (raw.toInt()) {
         0 -> "AF-S"
         1 -> "AF-C"
-        4 -> "MF"
+        2 -> "AF-F"
+        3, 4 -> "MF"
         else -> if (raw == 0L) "--" else "F$raw"
     }
 

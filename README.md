@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="96" alt="N I C O"><br>
+  <img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.webp" width="108" alt="N I C O"><br>
   <strong>N &nbsp; I &nbsp; C &nbsp; O</strong>
 </p>
 
@@ -7,6 +7,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)&nbsp;
 [![Release](https://img.shields.io/github/v/release/haecksenwerk/nico)](https://github.com/haecksenwerk/nico/releases/latest)&nbsp;
+[![Ko-Fi](https://img.shields.io/badge/Ko--fi-Support%20this%20project-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/haecksenwerk)&nbsp;
 
 <br />
 
@@ -32,7 +33,18 @@ Additionally, please ensure your Android device supports USB-OTG mode.
 
 ### Obtainium
 
-The easiest way to install and keep nico up to date is via [Obtainium](https://github.com/ImranR98/Obtainium) — it fetches updates directly from GitHub Releases, no app store required.
+<br />
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22:%22com.haecksenwerk.nico%22,%22url%22:%22https://github.com/haecksenwerk/nico%22,%22author%22:%22haecksenwerk%22,%22name%22:%22nico%22%7D">
+    <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" 
+         alt="Get it on Obtainium" 
+         height="60"
+         style="vertical-align: middle;">
+  </a>
+</p>
+<br />
+
+The easiest way to install and keep NICO up to date is via [Obtainium](https://github.com/ImranR98/Obtainium) - it fetches updates directly from GitHub Releases, no app store required.
 
 1. Install [Obtainium](https://github.com/ImranR98/Obtainium)
 2. Add the following URL as a new app source:
@@ -46,17 +58,6 @@ The app‑signing certificate hash is shown in the Obtainium info screen for rad
 ```
 88:CF:E4:BF:74:80:E7:BC:7B:CC:37:64:B1:73:5B:8E:B9:A1:99:2D:A9:7F:08:4A:FD:47:9C:41:ED:4F:7D:B8
 ```
-
-<br />
-<p align="center">
-  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22:%22com.haecksenwerk.nico%22,%22url%22:%22https://github.com/haecksenwerk/nico%22,%22author%22:%22haecksenwerk%22,%22name%22:%22nico%22%7D">
-    <img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" 
-         alt="Get it on Obtainium" 
-         height="40"
-         style="vertical-align: middle;">
-  </a>
-</p>
-<br />
 
 ### Manual download
 
@@ -74,9 +75,12 @@ Grab the latest signed APK directly from the [Releases](https://github.com/haeck
    - Mode, Shutter speed, EV compensation, and ISO are **display-only** - they reflect the current camera state but cannot be changed from the app.
 4. **Select AF area** by tapping anywhere on the live view image. A yellow bracket appears briefly at the tapped spot to confirm the new focus point.
 5. **Focus** by pressing the circular focus button to the left of the shutter button. The button turns green when the camera has acquired focus and red when it has not.
-6. **Capture** a photo with the shutter button. Use the timer selector to add a delay before release.
-7. **Browse** pictures on the camera card in the browser tab. Tap a picture to preview it.
-8. **Download** pictures from the browser - saved to the **Pictures** folder on your phone and visible in the **nico** album in Google Photos.
+6. **Manual focus** by setting *Controls* to *MF* in Settings - this swaps the timer for a focus wheel beneath the live view. Drag the wheel to drive focus, and tap the dial beside it to change the step size (Low / Medium / High).
+   > **The focus wheel only works as an override while the camera is in an AF mode** (AF-S / AF-C / AF-F). If you switch the **camera to MF**, the camera accepts focus changes **only through the lens focus ring**
+7. **Focus peaking** by tapping the **PEAK** badge above the live view to outline the areas that are in focus. The sensitivity (Low / Medium / High) and overlay colour (red / yellow / blue / white) can be adjusted in Settings.
+8. **Capture** a photo with the shutter button. Use the timer selector to add a delay before release.
+9. **Browse** pictures on the camera card in the browser tab. Tap a picture to preview it.
+10. **Download** pictures from the browser - saved to the **Pictures** folder on your phone and visible in the **NICO** album in Google Photos.
 
 ---
 
@@ -84,6 +88,14 @@ Grab the latest signed APK directly from the [Releases](https://github.com/haeck
 
 - Android phone with USB OTG / USB host support
 - Nikon camera set to **PTP** (not MTP or "iPhone") USB mode
+
+---
+
+## Support
+
+If you enjoy using NICO, consider buying me a coffee :)
+
+## [![Ko-Fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/haecksenwerk)
 
 ---
 

@@ -67,6 +67,12 @@ object PtpConstants {
 
     // Nikon Z-series vendor property codes (write-enabled where standard codes are read-only)
     const val PROP_NIKON_FOCUS_MODE = 0xD061      // UINT8 enum: 0=AF-S, 1=AF-C, 4=MF
+    // PROP_NIKON_FOCUS_MODE values (libgphoto2 nikon_liveviewaffocus, config.c:6113):
+    // 0=AF-S 1=AF-C 2=AF-F 3=MF(fixed) 4=MF(selection). In either MF state the camera
+    // disengages the AF motor, so remote MfDrive (0x9204) has no effect — only the lens
+    // ring moves focus.  Used to disable the in-app focus wheel.
+    const val NIKON_FOCUS_MODE_MF_FIXED = 3
+    const val NIKON_FOCUS_MODE_MF = 4
     // UINT32 enum; max value × 4 = ChangeAfArea x-coordinate range
     // APS-C bodies (Z fc, Z30, Z50): [0,360,720,1440] → x_max=5760
     // Full-frame bodies (Z6, Z6II):  [0,512,1024,2048] → x_max=8192
